@@ -1,13 +1,13 @@
 <?php
 /**
  * Plugin Name:       MousePlayer for WooCommerce
- * Plugin URI:        https://mouseplayer.com/integrations/woocommerce
+ * Plugin URI:        https://www.mouseplayer.com/integrations/woocommerce
  * Description:       Adds MousePlayer session replay to your store and forwards the GA4-style ecommerce events (view_item_list, select_item, view_item, add_to_cart, begin_checkout, purchase) so the Ecommerce Funnel fills itself.
  * Version:           1.0.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            MousePlayer
- * Author URI:        https://mouseplayer.com
+ * Author URI:        https://www.mouseplayer.com
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       mouseplayer-for-woocommerce
@@ -41,7 +41,7 @@ function mouseplayer_wc_get_settings() {
 	$defaults = array(
 		'enabled'            => 0,
 		'channel_id'         => '',
-		'host'               => 'mouseplayer.com',
+		'host'               => 'www.mouseplayer.com',
 		'ev_view_item_list'  => 1,
 		'ev_select_item'     => 1,
 		'ev_view_item'       => 1,
