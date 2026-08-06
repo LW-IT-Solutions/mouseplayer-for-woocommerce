@@ -72,11 +72,11 @@ class MousePlayer_WC_Settings {
 		$out['channel_id'] = substr( (string) $channel, 0, 64 );
 
 		// Host ohne Schema/Pfad - das Skript wird immer ueber https eingebunden.
-		$host = isset( $input['host'] ) ? sanitize_text_field( $input['host'] ) : 'mouseplayer.com';
+		$host = isset( $input['host'] ) ? sanitize_text_field( $input['host'] ) : 'www.mouseplayer.com';
 		$host = preg_replace( '#^https?://#i', '', (string) $host );
 		$host = preg_replace( '#[/?].*$#', '', $host );
 		$host = preg_replace( '/[^a-zA-Z0-9.\-]/', '', $host );
-		$out['host'] = '' !== $host ? substr( $host, 0, 190 ) : 'mouseplayer.com';
+		$out['host'] = '' !== $host ? substr( $host, 0, 190 ) : 'www.mouseplayer.com';
 
 		$flags = array(
 			'enabled',
@@ -137,9 +137,9 @@ class MousePlayer_WC_Settings {
 					echo esc_html__( 'This plugin sends visitor interaction data to MousePlayer, an external service. Nothing is sent until you enter your Channel ID and switch tracking on.', 'mouseplayer-for-woocommerce' );
 					?>
 					<br />
-					<a href="https://mouseplayer.com/privacy" target="_blank" rel="noopener noreferrer"><?php echo esc_html__( 'Privacy policy', 'mouseplayer-for-woocommerce' ); ?></a>
+					<a href="https://www.mouseplayer.com/privacy" target="_blank" rel="noopener noreferrer"><?php echo esc_html__( 'Privacy policy', 'mouseplayer-for-woocommerce' ); ?></a>
 					&nbsp;&middot;&nbsp;
-					<a href="https://mouseplayer.com/terms" target="_blank" rel="noopener noreferrer"><?php echo esc_html__( 'Terms of service', 'mouseplayer-for-woocommerce' ); ?></a>
+					<a href="https://www.mouseplayer.com/terms" target="_blank" rel="noopener noreferrer"><?php echo esc_html__( 'Terms of service', 'mouseplayer-for-woocommerce' ); ?></a>
 				</p>
 			</div>
 
@@ -185,7 +185,7 @@ class MousePlayer_WC_Settings {
 								name="<?php echo esc_attr( MOUSEPLAYER_WC_OPTION ); ?>[host]"
 								value="<?php echo esc_attr( $s['host'] ); ?>" />
 							<p class="description">
-								<?php echo esc_html__( 'Only change this if you were given a dedicated host. Default: mouseplayer.com', 'mouseplayer-for-woocommerce' ); ?>
+								<?php echo esc_html__( 'Only change this if you were given a dedicated host. Default: www.mouseplayer.com', 'mouseplayer-for-woocommerce' ); ?>
 							</p>
 						</td>
 					</tr>
