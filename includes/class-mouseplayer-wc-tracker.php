@@ -1,6 +1,6 @@
 <?php
 /**
- * Skript-Einbindung und Emission der Ecommerce-Events.
+ * Front end: tracking snippet, consent bridge, masking and ecommerce events.
  *
  * @package MousePlayer_For_WooCommerce
  */
@@ -10,198 +10,367 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Haengt sich in WooCommerce ein und schiebt Events in die mp_q Queue.
+ * Prints the MousePlayer snippet and hands WooCommerce events to it.
  */
 class MousePlayer_WC_Tracker {
 
 	/**
-	 * Events, die in dieser Anfrage noch ausgegeben werden muessen.
+	 * WooCommerce session key for add_to_cart events waiting for the next page view.
+	 */
+	const SESSION_KEY = 'mouseplayer_wc_pending';
+
+	/**
+	 * Order meta key that marks a reported purchase.
+	 */
+	const ORDER_META = '_mouseplayer_wc_reported';
+
+	/**
+	 * Events for this page view.
 	 *
 	 * @var array
 	 */
-	private $queue = array();
+	private $events = array();
 
 	/**
-	 * Hooks registrieren.
+	 * Page context for MousePlayer.setContext().
+	 *
+	 * @var array
+	 */
+	private $context = array();
+
+	/**
+	 * Register hooks.
 	 */
 	public function __construct() {
-		add_action( 'wp_head', array( $this, 'print_bootstrap' ), 1 );
-		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_script' ) );
-
-		// Ecommerce-Hooks nur, wenn WooCommerce wirklich laeuft.
-		add_action(
-			'wp',
-			function () {
-				if ( ! class_exists( 'WooCommerce' ) || ! mouseplayer_wc_is_active() ) {
-					return;
-				}
-				$this->collect_page_events();
-			}
-		);
-
-		add_action( 'woocommerce_thankyou', array( $this, 'on_thankyou' ), 10, 1 );
-		add_action( 'wp_footer', array( $this, 'print_queue' ), 99 );
+		add_action( 'wp_head', array( $this, 'print_head' ), 1 );
+		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue' ) );
+		add_action( 'wp', array( $this, 'collect_page_events' ) );
+		add_action( 'woocommerce_thankyou', array( $this, 'on_thankyou' ), 20 );
+		add_action( 'woocommerce_add_to_cart', array( $this, 'on_add_to_cart' ), 20, 4 );
+		add_filter( 'woocommerce_add_to_cart_fragments', array( $this, 'cart_fragments' ) );
+		add_action( 'wp_footer', array( $this, 'hand_over' ), 5 );
+		add_filter( 'do_shortcode_tag', array( $this, 'mask_shortcode' ), 10, 2 );
+		add_filter( 'render_block', array( $this, 'mask_block' ), 10, 2 );
+		add_filter( 'woocommerce_form_field_args', array( $this, 'ignore_field' ) );
+		add_shortcode( 'mouseplayer_privacy_link', array( $this, 'privacy_link_shortcode' ) );
 	}
 
 	/**
-	 * mp_config und die Pre-Load-Queue MUESSEN vor mp.js stehen.
+	 * Settings and the WooCommerce state allow recording events in this request (also AJAX and Store API).
+	 *
+	 * @param string $event Event setting key, for example ev_add_to_cart.
+	 * @return bool
 	 */
-	public function print_bootstrap() {
+	private function may_queue( $event ) {
+		$s = mouseplayer_wc_get_settings();
+		if ( empty( $s['enabled'] ) || '' === (string) $s['channel_id'] || empty( $s[ $event ] ) ) {
+			return false;
+		}
+		if ( mouseplayer_wc_is_excluded_user( $s ) ) {
+			return false;
+		}
+		/** This filter is documented in mouseplayer-for-woocommerce.php */
+		return (bool) apply_filters( 'mouseplayer_wc_is_active', true );
+	}
+
+	/**
+	 * Domain verification meta element and the snippet, as early as possible in the head.
+	 */
+	public function print_head() {
+		$s = mouseplayer_wc_get_settings();
+
+		if ( '' !== (string) $s['verify_token'] && ( is_front_page() || is_home() ) ) {
+			echo '<meta name="mouseplayer-verify" content="' . esc_attr( $s['verify_token'] ) . '" />' . "\n";
+		}
+
 		if ( ! mouseplayer_wc_is_active() ) {
 			return;
 		}
 
-		$s      = mouseplayer_wc_get_settings();
-		$config = array( 'channel' => (string) $s['channel_id'] );
-
-		// Optionale Identitaet: nie die rohe E-Mail, sondern ein stabiler Hash.
+		$config = array(
+			'channel' => (string) $s['channel_id'],
+			'mode'    => 'web_only',
+		);
 		if ( ! empty( $s['identify_customers'] ) && is_user_logged_in() ) {
-			$config['user_id'] = 'wp_' . substr( hash( 'sha256', get_current_user_id() . '|' . wp_salt( 'nonce' ) ), 0, 32 );
+			// A stable pseudonym, never the email address or the user ID itself.
+			$config['user_id'] = 'wp_' . substr( hash_hmac( 'sha256', (string) get_current_user_id(), wp_salt( 'auth' ) ), 0, 32 );
 		}
 
-		echo "<script id=\"mouseplayer-bootstrap\">";
-		echo 'window.mp_config=' . wp_json_encode( $config ) . ';';
-		echo 'window.mp_q=window.mp_q||[];';
-		echo 'window.mp=window.mp||function(){(window.mp.q=window.mp.q||[]).push(arguments);};';
-		echo '</script>';
+		$js = 'window.mp_config=' . wp_json_encode( $config ) . ';'
+			. 'window.mp=window.mp||function(){(window.mp.q=window.mp.q||[]).push(arguments);};'
+			. '(function(w,d,s,id){w.mp_channelid=id;var f=d.getElementsByTagName(s)[0],j=d.createElement(s);'
+			. 'j.async=true;j.src=' . wp_json_encode( MousePlayer_WC_Connection::script_url( $s['host'] ) ) . ';'
+			. 'f.parentNode.insertBefore(j,f);})(window,document,"script",' . wp_json_encode( (string) $s['channel_id'] ) . ');';
+
+		$attributes = array( 'id' => 'mouseplayer-snippet' );
+		$cmps       = mouseplayer_wc_cmps();
+		if ( 'cmp_block' === $s['consent_mode'] && isset( $cmps[ $s['consent_cmp'] ]['attributes'] ) ) {
+			$attributes = array_merge( $attributes, (array) $cmps[ $s['consent_cmp'] ]['attributes'] );
+		}
+
+		/**
+		 * Filters the attributes of the snippet script element, for example to block it with another consent tool.
+		 *
+		 * @param array $attributes Attribute name => value.
+		 * @param array $s          Plugin settings.
+		 */
+		$attributes = (array) apply_filters( 'mouseplayer_wc_script_attributes', $attributes, $s );
+
+		wp_print_inline_script_tag( $js, $attributes );
 	}
 
 	/**
-	 * mp.js einbinden - ueber wp_enqueue_script, nicht als handgeschriebenes Tag.
+	 * Register the event script. The data is added in the footer, after the page content has run.
 	 */
-	public function enqueue_script() {
+	public function enqueue() {
 		if ( ! mouseplayer_wc_is_active() ) {
 			return;
 		}
-
-		$s   = mouseplayer_wc_get_settings();
-		$src = 'https://' . $s['host'] . '/mp.js';
-
-		wp_enqueue_script( 'mouseplayer', esc_url_raw( $src ), array(), MOUSEPLAYER_WC_VERSION, false );
-	}
-
-	/**
-	 * Event in die Ausgabewarteschlange legen.
-	 *
-	 * @param string $name   Eventname.
-	 * @param array  $params Parameter.
-	 */
-	private function push( $name, $params = array() ) {
-		$this->queue[] = array(
-			'name'   => (string) $name,
-			'params' => is_array( $params ) ? $params : array(),
+		wp_enqueue_script(
+			'mouseplayer-wc',
+			MOUSEPLAYER_WC_URL . 'assets/frontend.js',
+			array(),
+			MOUSEPLAYER_WC_VERSION,
+			array( 'in_footer' => true )
 		);
 	}
 
 	/**
-	 * Preis/Waehrung nur anhaengen, wenn erlaubt.
-	 * MousePlayer erwartet 'price' und 'currency' - daran haengt die Umsatzanzeige.
+	 * Add price and currency when allowed.
 	 *
-	 * @param array $params Bestehende Parameter.
-	 * @param float $value  Betrag.
+	 * @param array $params Event parameters.
+	 * @param mixed $value  Amount.
 	 * @return array
 	 */
 	private function with_value( $params, $value ) {
 		$s = mouseplayer_wc_get_settings();
-		if ( empty( $s['send_value'] ) ) {
+		if ( empty( $s['send_value'] ) || '' === (string) $value ) {
 			return $params;
 		}
 		$params['price']    = round( (float) $value, 2 );
-		$params['currency'] = function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : '';
+		$params['currency'] = get_woocommerce_currency();
 		return $params;
 	}
 
 	/**
-	 * Seitenabhaengige Events einsammeln.
+	 * Add an event for this page view.
+	 *
+	 * @param string $name   Event name.
+	 * @param array  $params Flat parameters.
+	 * @param string $id     Unique ID, so that the browser does not send it twice.
 	 */
-	private function collect_page_events() {
+	private function add_event( $name, $params, $id = '' ) {
+		$this->events[] = array(
+			'id' => '' !== $id ? $id : wp_generate_uuid4(),
+			'n'  => (string) $name,
+			'p'  => $params,
+		);
+	}
+
+	/**
+	 * Events and context that depend on the page.
+	 */
+	public function collect_page_events() {
+		if ( ! mouseplayer_wc_is_active() || ! function_exists( 'WC' ) ) {
+			return;
+		}
 		$s = mouseplayer_wc_get_settings();
 
-		// view_item_list - Shop, Kategorie, Tag, Suche.
-		if ( ! empty( $s['ev_view_item_list'] ) && ( is_shop() || is_product_category() || is_product_tag() || is_search() ) ) {
-			$this->push(
-				'view_item_list',
-				array(
-					'list_name' => $this->current_list_name(),
-				)
-			);
+		if ( ! empty( $s['ev_view_item_list'] ) && ( is_shop() || is_product_taxonomy() || ( is_search() && 'product' === get_query_var( 'post_type' ) ) ) ) {
+			$this->add_event( 'view_item_list', array( 'list_name' => $this->list_name() ) );
 		}
 
-		// view_item - Produktdetailseite.
-		if ( ! empty( $s['ev_view_item'] ) && is_product() ) {
+		if ( is_product() ) {
 			$product = wc_get_product( get_queried_object_id() );
 			if ( $product ) {
-				$this->push(
-					'view_item',
-					$this->with_value(
-						array(
-							'item_id'   => (string) $product->get_id(),
-							'item_name' => $product->get_name(),
-							'sku'       => (string) $product->get_sku(),
-						),
-						$product->get_price()
-					)
+				$price = wc_get_price_to_display( $product );
+				if ( ! empty( $s['ev_view_item'] ) ) {
+					$this->add_event(
+						'view_item',
+						$this->with_value(
+							array(
+								'item_id'   => (string) $product->get_id(),
+								'item_name' => $product->get_name(),
+								'sku'       => (string) $product->get_sku(),
+							),
+							$price
+						)
+					);
+				}
+				$context = array(
+					'page_type'  => 'product',
+					'product_id' => (string) $product->get_id(),
+					'in_stock'   => $product->is_in_stock(),
 				);
+				$terms   = get_the_terms( $product->get_id(), 'product_cat' );
+				if ( is_array( $terms ) && $terms ) {
+					$context['category'] = $terms[0]->name;
+				}
+				if ( ! empty( $s['send_value'] ) ) {
+					$context['price']    = round( (float) $price, 2 );
+					$context['currency'] = get_woocommerce_currency();
+				}
+				$this->context = $context;
 			}
 		}
 
-		// begin_checkout - Checkout, aber NICHT die Danke-Seite.
-		if ( ! empty( $s['ev_begin_checkout'] ) && function_exists( 'is_checkout' ) && is_checkout()
-			&& ! ( function_exists( 'is_order_received_page' ) && is_order_received_page() ) ) {
-			$total = ( WC()->cart && ! WC()->cart->is_empty() ) ? WC()->cart->get_total( 'edit' ) : 0;
-			$items = ( WC()->cart ) ? WC()->cart->get_cart_contents_count() : 0;
-			$this->push(
-				'begin_checkout',
-				$this->with_value( array( 'items' => (int) $items ), $total )
-			);
+		$cart = WC()->cart;
+		if ( is_cart() && $cart ) {
+			$this->context = $this->cart_context( 'cart', $s );
+		}
+
+		if ( is_checkout() && ! is_order_received_page() && $cart ) {
+			if ( ! empty( $s['ev_begin_checkout'] ) && ! $cart->is_empty() ) {
+				$this->add_event(
+					'begin_checkout',
+					$this->with_value( array( 'items' => (int) $cart->get_cart_contents_count() ), $cart->get_total( 'edit' ) )
+				);
+			}
+			$this->context = $this->cart_context( 'checkout', $s );
+		}
+
+		// add_to_cart events from form posts and AJAX requests that were not delivered yet.
+		if ( WC()->session ) {
+			$pending = WC()->session->get( self::SESSION_KEY, array() );
+			if ( is_array( $pending ) && $pending ) {
+				$this->events = array_merge( $this->events, $pending );
+				WC()->session->set( self::SESSION_KEY, array() );
+			}
 		}
 	}
 
 	/**
-	 * Sprechender Listenname fuer view_item_list.
+	 * Context for cart and checkout.
+	 *
+	 * @param string $type Page type.
+	 * @param array  $s    Settings.
+	 * @return array
+	 */
+	private function cart_context( $type, $s ) {
+		$cart    = WC()->cart;
+		$context = array(
+			'page_type'  => $type,
+			'cart_items' => (int) $cart->get_cart_contents_count(),
+		);
+		if ( ! empty( $s['send_value'] ) ) {
+			$context['cart_value'] = round( (float) $cart->get_total( 'edit' ), 2 );
+			$context['currency']   = get_woocommerce_currency();
+		}
+		return $context;
+	}
+
+	/**
+	 * Name of the product list on archive pages.
 	 *
 	 * @return string
 	 */
-	private function current_list_name() {
+	private function list_name() {
 		if ( is_search() ) {
 			return 'search';
 		}
-		if ( is_product_category() || is_product_tag() ) {
+		if ( is_product_taxonomy() ) {
 			$term = get_queried_object();
-			if ( $term && isset( $term->name ) ) {
-				return (string) $term->name;
+			if ( $term instanceof WP_Term ) {
+				return $term->name;
 			}
 		}
 		return 'shop';
 	}
 
 	/**
-	 * purchase auf der Bestellbestaetigung - genau einmal pro Bestellung.
+	 * Remember add_to_cart for the next page view or the next cart fragment refresh.
 	 *
-	 * @param int $order_id Bestellnummer.
+	 * @param string $cart_item_key Cart item key.
+	 * @param int    $product_id    Product ID.
+	 * @param int    $quantity      Quantity added.
+	 * @param int    $variation_id  Variation ID.
+	 */
+	public function on_add_to_cart( $cart_item_key, $product_id, $quantity, $variation_id ) {
+		if ( ! $this->may_queue( 'ev_add_to_cart' ) || ! WC()->session ) {
+			return;
+		}
+		$product = wc_get_product( $variation_id ? $variation_id : $product_id );
+		if ( ! $product ) {
+			return;
+		}
+		$params = array(
+			'item_id'   => (string) $product_id,
+			'item_name' => $product->get_name(),
+			'quantity'  => (int) $quantity,
+		);
+		if ( $variation_id ) {
+			$params['variant_id'] = (string) $variation_id;
+		}
+		$params = $this->with_value( $params, (float) wc_get_price_to_display( $product ) * (int) $quantity );
+
+		$pending = WC()->session->get( self::SESSION_KEY, array() );
+		if ( ! is_array( $pending ) ) {
+			$pending = array();
+		}
+		$pending[] = array(
+			'id' => wp_generate_uuid4(),
+			'n'  => 'add_to_cart',
+			'p'  => $params,
+		);
+		WC()->session->set( self::SESSION_KEY, array_slice( $pending, -20 ) );
+	}
+
+	/**
+	 * Hand waiting events to the browser with the cart fragments of an AJAX add to cart.
+	 *
+	 * @param array $fragments Fragments.
+	 * @return array
+	 */
+	public function cart_fragments( $fragments ) {
+		if ( ! is_array( $fragments ) || ! function_exists( 'WC' ) || ! WC()->session ) {
+			return $fragments;
+		}
+		$pending = WC()->session->get( self::SESSION_KEY, array() );
+		if ( ! is_array( $pending ) ) {
+			$pending = array();
+		}
+		if ( $pending ) {
+			WC()->session->set( self::SESSION_KEY, array() );
+		}
+		$fragments['div.mouseplayer-wc-pending'] = '<div class="mouseplayer-wc-pending" hidden data-events="' . esc_attr( (string) wp_json_encode( $pending ) ) . '"></div>';
+		return $fragments;
+	}
+
+	/**
+	 * Report a purchase on the order confirmation page, once per order.
+	 *
+	 * @param int $order_id Order ID.
 	 */
 	public function on_thankyou( $order_id ) {
+		if ( ! $order_id || ! mouseplayer_wc_is_active() ) {
+			return;
+		}
 		$s = mouseplayer_wc_get_settings();
-
-		if ( empty( $s['ev_purchase'] ) || ! mouseplayer_wc_is_active() || ! $order_id ) {
+		if ( empty( $s['ev_purchase'] ) ) {
 			return;
 		}
-
 		$order = wc_get_order( $order_id );
-		if ( ! $order ) {
+		if ( ! $order || $order->get_meta( self::ORDER_META ) ) {
 			return;
 		}
 
-		// Die Danke-Seite wird beim Neuladen erneut aufgerufen. Ohne diese Sperre
-		// wuerde jede Aktualisierung einen weiteren Kauf melden und Umsatz sowie
-		// Funnel-Zahlen aufblaehen.
-		if ( $order->get_meta( '_mouseplayer_tracked' ) ) {
+		/**
+		 * Filters the order statuses that count as a purchase. Failed, cancelled and pending (payment not completed)
+		 * orders are not reported by default.
+		 *
+		 * @param array    $statuses Order statuses without the wc- prefix.
+		 * @param WC_Order $order    The order.
+		 */
+		$statuses = (array) apply_filters( 'mouseplayer_wc_purchase_statuses', array( 'processing', 'completed', 'on-hold' ), $order );
+		if ( ! in_array( $order->get_status(), $statuses, true ) ) {
 			return;
 		}
-		$order->update_meta_data( '_mouseplayer_tracked', current_time( 'mysql' ) );
-		$order->save();
 
-		$this->push(
+		// A reload of the confirmation page must not report the order again.
+		$order->update_meta_data( self::ORDER_META, gmdate( 'c' ) );
+		$order->save_meta_data();
+
+		$this->add_event(
 			'purchase',
 			$this->with_value(
 				array(
@@ -209,65 +378,131 @@ class MousePlayer_WC_Tracker {
 					'items'          => (int) $order->get_item_count(),
 				),
 				$order->get_total()
-			)
+			),
+			'purchase-' . $order->get_id()
+		);
+		$this->context = array(
+			'page_type'  => 'purchase',
+			'cart_items' => (int) $order->get_item_count(),
 		);
 	}
 
 	/**
-	 * Gesammelte Events sowie die JS-seitigen Listener ausgeben.
+	 * Hand events, context and options to the event script before it is printed.
 	 */
-	public function print_queue() {
-		if ( ! mouseplayer_wc_is_active() ) {
+	public function hand_over() {
+		if ( ! wp_script_is( 'mouseplayer-wc', 'enqueued' ) ) {
 			return;
 		}
+		$s    = mouseplayer_wc_get_settings();
+		$data = array(
+			'events'      => $this->events,
+			'context'     => ! empty( $s['send_context'] ) ? $this->context : array(),
+			'selectItem'  => ! empty( $s['ev_select_item'] ),
+			'addToCart'   => ! empty( $s['ev_add_to_cart'] ),
+			'consentApi'  => 'wp_consent_api' === $s['consent_mode'],
+			'ignoreTyped' => ! empty( $s['ignore_typing'] ),
+		);
+		wp_add_inline_script( 'mouseplayer-wc', 'window.mouseplayerWc=' . wp_json_encode( $data ) . ';', 'before' );
+		echo '<div class="mouseplayer-wc-pending" hidden data-events="[]"></div>' . "\n";
+	}
 
-		$s   = mouseplayer_wc_get_settings();
-		$out = '';
-
-		foreach ( $this->queue as $ev ) {
-			$out .= 'window.mp_q.push(["event",' . wp_json_encode( $ev['name'] ) . ',' . wp_json_encode( $ev['params'] ) . ']);';
+	/**
+	 * Wrap WooCommerce shortcodes with personal data in a masked area.
+	 *
+	 * @param string $output Shortcode output.
+	 * @param string $tag    Shortcode name.
+	 * @return string
+	 */
+	public function mask_shortcode( $output, $tag ) {
+		if ( ! in_array( $tag, $this->masked_shortcodes(), true ) || ! is_string( $output ) || '' === $output ) {
+			return $output;
 		}
+		return '<div class="mouseplayer-wc-masked" data-mp-mask>' . $output . '</div>';
+	}
 
-		// add_to_cart und select_item passieren im Browser (AJAX-Buttons, Klick auf
-		// eine Kachel), lassen sich also serverseitig nicht zuverlaessig abgreifen.
-		if ( ! empty( $s['ev_add_to_cart'] ) ) {
-			$out .= "(function(){
-				function send(el){
-					try{
-						var p={};
-						if(el){
-							p.item_id=el.getAttribute('data-product_id')||el.value||'';
-							var q=el.getAttribute('data-quantity'); if(q) p.quantity=parseInt(q,10)||1;
-						}
-						window.mp_q.push(['event','add_to_cart',p]);
-					}catch(e){}
-				}
-				document.addEventListener('click',function(e){
-					var b=e.target.closest && e.target.closest('.add_to_cart_button, .single_add_to_cart_button');
-					if(b) send(b);
-				},true);
-				if(window.jQuery){ jQuery(document.body).on('added_to_cart',function(ev,frag,hash,btn){ send(btn && btn[0]); }); }
-			})();";
+	/**
+	 * Mark WooCommerce blocks with personal data as masked.
+	 *
+	 * @param string $content Block HTML.
+	 * @param array  $block   Parsed block.
+	 * @return string
+	 */
+	public function mask_block( $content, $block ) {
+		$name = isset( $block['blockName'] ) ? (string) $block['blockName'] : '';
+		if ( '' === $name || '' === $content || 0 !== strpos( $name, 'woocommerce/' ) ) {
+			return $content;
 		}
-
-		if ( ! empty( $s['ev_select_item'] ) ) {
-			$out .= "(function(){
-				document.addEventListener('click',function(e){
-					var a=e.target.closest && e.target.closest('.products .product a, .wc-block-grid__product a');
-					if(!a) return;
-					try{
-						var li=a.closest('.product, .wc-block-grid__product');
-						var t=li?li.querySelector('.woocommerce-loop-product__title, .wc-block-grid__product-title'):null;
-						window.mp_q.push(['event','select_item',{item_name:(t?t.textContent:'').trim().slice(0,120)}]);
-					}catch(err){}
-				},true);
-			})();";
+		$s       = mouseplayer_wc_get_settings();
+		$classic = ( 'woocommerce/classic-shortcode' === $name && isset( $block['attrs']['shortcode'] ) ) ? (string) $block['attrs']['shortcode'] : '';
+		$mask    = false;
+		if ( ! empty( $s['mask_checkout'] ) && ( 'woocommerce/checkout' === $name || 'checkout' === $classic || 0 === strpos( $name, 'woocommerce/order-confirmation' ) ) ) {
+			$mask = true;
 		}
-
-		if ( '' === $out ) {
-			return;
+		if ( ! empty( $s['mask_cart'] ) && ( 'woocommerce/cart' === $name || 'cart' === $classic ) ) {
+			$mask = true;
 		}
+		if ( ! $mask ) {
+			return $content;
+		}
+		$tags = new WP_HTML_Tag_Processor( $content );
+		if ( $tags->next_tag() ) {
+			$tags->set_attribute( 'data-mp-mask', true );
+			return $tags->get_updated_html();
+		}
+		return $content;
+	}
 
-		echo '<script id="mouseplayer-events">window.mp_q=window.mp_q||[];' . $out . '</script>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Inline script, values passed through wp_json_encode().
+	/**
+	 * Shortcodes that are masked with the current settings.
+	 *
+	 * @return array
+	 */
+	private function masked_shortcodes() {
+		$s    = mouseplayer_wc_get_settings();
+		$list = array();
+		if ( ! empty( $s['mask_checkout'] ) ) {
+			$list = array( 'woocommerce_checkout', 'woocommerce_my_account', 'woocommerce_order_tracking' );
+		}
+		if ( ! empty( $s['mask_cart'] ) ) {
+			$list[] = 'woocommerce_cart';
+		}
+		return $list;
+	}
+
+	/**
+	 * Keep typing in WooCommerce form fields out of the recording.
+	 *
+	 * @param array $args Field arguments.
+	 * @return array
+	 */
+	public function ignore_field( $args ) {
+		$s = mouseplayer_wc_get_settings();
+		if ( empty( $s['ignore_typing'] ) || ! is_array( $args ) ) {
+			return $args;
+		}
+		if ( ! isset( $args['custom_attributes'] ) || ! is_array( $args['custom_attributes'] ) ) {
+			$args['custom_attributes'] = array();
+		}
+		$args['custom_attributes']['data-mp-ignore'] = '1';
+		return $args;
+	}
+
+	/**
+	 * [mouseplayer_privacy_link] prints a link to MousePlayer's self-service data access page.
+	 *
+	 * @param array|string $atts Shortcode attributes.
+	 * @return string
+	 */
+	public function privacy_link_shortcode( $atts ) {
+		$atts = shortcode_atts(
+			array(
+				'text' => __( 'Show the data MousePlayer has recorded about this browser', 'mouseplayer-for-woocommerce' ),
+			),
+			$atts,
+			'mouseplayer_privacy_link'
+		);
+		wp_enqueue_script( 'mouseplayer-wc-privacy', MOUSEPLAYER_WC_URL . 'assets/privacy-link.js', array(), MOUSEPLAYER_WC_VERSION, array( 'in_footer' => true ) );
+		return '<a class="mouseplayer-privacy-link" href="' . esc_url( mouseplayer_wc_site_url( '/my-data' ) ) . '" rel="noopener" target="_blank">' . esc_html( $atts['text'] ) . '</a>';
 	}
 }
