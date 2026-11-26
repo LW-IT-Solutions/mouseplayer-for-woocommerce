@@ -3,7 +3,7 @@
  * Plugin Name:       MousePlayer for WooCommerce
  * Plugin URI:        https://github.com/LW-IT-Solutions/mouseplayer-for-woocommerce
  * Description:       Session replay and heatmaps from MousePlayer for WooCommerce, with consent handling, masking of checkout and account pages, and the six ecommerce funnel events.
- * Version:           1.0.1
+ * Version:           1.1.0
  * Requires at least: 6.5
  * Requires PHP:      7.4
  * Requires Plugins:  woocommerce
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'MOUSEPLAYER_WC_VERSION', '1.0.1' );
+define( 'MOUSEPLAYER_WC_VERSION', '1.1.0' );
 define( 'MOUSEPLAYER_WC_FILE', __FILE__ );
 define( 'MOUSEPLAYER_WC_PATH', plugin_dir_path( __FILE__ ) );
 define( 'MOUSEPLAYER_WC_URL', plugin_dir_url( __FILE__ ) );

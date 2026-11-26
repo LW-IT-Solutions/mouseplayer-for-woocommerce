@@ -4,7 +4,7 @@ Tags: woocommerce, session replay, heatmaps, conversion funnel, analytics
 Requires at least: 6.5
 Tested up to: 7.2
 Requires PHP: 7.4
-Stable tag: 1.0.1
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -100,6 +100,14 @@ Use the filter `mouseplayer_wc_is_active`, for example `add_filter( 'mouseplayer
 
 == Changelog ==
 
+= 1.1.0 =
+* Settings page: a status badge next to the title, tiles for connection, consent, privacy and shop events, and a section menu that stays in view.
+* Every settings section is a card with an icon; the save button stays reachable at the bottom while scrolling.
+* Shop events: a funnel diagram of the six steps that follows the checkboxes and shows which steps are switched off.
+* Consent options as selectable cards, tracking as a switch, roles as chips; the Channel ID is checked while typing with the rule used on saving.
+* Results of the connection check are coloured by status and show how long ago the check ran; the button shows that the check is running.
+* Layout for phones and keyboard focus improved. No change to what is sent.
+
 = 1.0.1 =
 * Readme and settings texts describe exactly what is sent and when: which requests the MousePlayer script makes, what the plugin hands to it, and that Check connection contacts MousePlayer on click.
 * mp.js is loaded with wp_enqueue_script (async) unless a consent tool has to block the snippet.
@@ -118,6 +126,9 @@ Use the filter `mouseplayer_wc_is_active`, for example `add_filter( 'mouseplayer
 * Excluded roles, status box, connection check with optional API key, domain verification, privacy policy text and privacy link shortcode.
 
 == Upgrade Notice ==
+
+= 1.1.0 =
+Clearer settings page with status tiles and a funnel diagram. No change to what is sent.
 
 = 1.0.1 =
 Exact texts about what is sent and when, mp.js loaded through wp_enqueue_script, typing kept out of all checkout and account forms. Your settings are kept.
