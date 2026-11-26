@@ -26,6 +26,17 @@ class MousePlayer_WC_Connection {
 	}
 
 	/**
+	 * The MousePlayer host from the settings, or the default host if the saved value is not a MousePlayer host.
+	 *
+	 * @param array $s Settings.
+	 * @return string
+	 */
+	public static function tracking_host( $s ) {
+		$host = isset( $s['host'] ) ? strtolower( (string) $s['host'] ) : '';
+		return self::is_allowed_host( $host ) ? $host : MOUSEPLAYER_WC_DEFAULT_HOST;
+	}
+
+	/**
 	 * URL of the tracking script.
 	 *
 	 * @param string $host Host name.
@@ -53,7 +64,7 @@ class MousePlayer_WC_Connection {
 	 */
 	public static function run( $s ) {
 		$rows = array();
-		$host = (string) $s['host'];
+		$host = self::tracking_host( $s );
 
 		$response = wp_remote_head(
 			self::script_url( $host ),
@@ -105,10 +116,17 @@ class MousePlayer_WC_Connection {
 			return $rows;
 		}
 
+		// Values from the MousePlayer API are sanitized right here, before they are compared, stored or shown.
 		$found = null;
 		foreach ( (array) ( $projects['data']['data'] ?? array() ) as $project ) {
-			if ( is_array( $project ) && isset( $project['channelid'] ) && (string) $project['channelid'] === (string) $s['channel_id'] ) {
-				$found = $project;
+			if ( ! is_array( $project ) || ! isset( $project['channelid'] ) || ! is_scalar( $project['channelid'] ) ) {
+				continue;
+			}
+			if ( sanitize_text_field( (string) $project['channelid'] ) === (string) $s['channel_id'] ) {
+				$found = array(
+					'domain' => isset( $project['domain'] ) && is_scalar( $project['domain'] ) ? self::clean_domain( (string) $project['domain'] ) : '',
+					'status' => isset( $project['status'] ) && is_scalar( $project['status'] ) ? sanitize_key( (string) $project['status'] ) : '',
+				);
 				break;
 			}
 		}
@@ -121,7 +139,7 @@ class MousePlayer_WC_Connection {
 			return $rows;
 		}
 
-		$domain = preg_replace( '/^www\./', '', strtolower( (string) ( $found['domain'] ?? '' ) ) );
+		$domain = $found['domain'];
 		$site   = self::site_host();
 		$match  = ( '' !== $domain && ( $site === $domain || substr( $site, -strlen( '.' . $domain ) ) === '.' . $domain ) );
 		$rows[] = array(
@@ -129,7 +147,7 @@ class MousePlayer_WC_Connection {
 			'label'   => __( 'Project', 'mouseplayer-for-woocommerce' ),
 			'message' => $match
 				/* translators: 1: project domain, 2: project status. */
-				? sprintf( __( 'Project found for %1$s (status: %2$s).', 'mouseplayer-for-woocommerce' ), $domain, (string) ( $found['status'] ?? '' ) )
+				? sprintf( __( 'Project found for %1$s (status: %2$s).', 'mouseplayer-for-woocommerce' ), $domain, $found['status'] )
 				/* translators: 1: project domain, 2: domain of this shop. */
 				: sprintf( __( 'The project is registered for %1$s, but this shop runs on %2$s. MousePlayer only accepts recordings from the registered domain and its subdomains.', 'mouseplayer-for-woocommerce' ), $domain, $site ),
 		);
@@ -143,8 +161,8 @@ class MousePlayer_WC_Connection {
 			);
 			return $rows;
 		}
-		$total  = (int) ( $sessions['data']['pagination']['total'] ?? 0 );
-		$latest = (string) ( $sessions['data']['data'][0]['start_time'] ?? '' );
+		$total  = isset( $sessions['data']['pagination']['total'] ) && is_scalar( $sessions['data']['pagination']['total'] ) ? absint( $sessions['data']['pagination']['total'] ) : 0;
+		$latest = isset( $sessions['data']['data'][0]['start_time'] ) && is_scalar( $sessions['data']['data'][0]['start_time'] ) ? sanitize_text_field( (string) $sessions['data']['data'][0]['start_time'] ) : '';
 		$rows[] = array(
 			'status'  => $total > 0 ? 'ok' : 'warning',
 			'label'   => __( 'Recordings', 'mouseplayer-for-woocommerce' ),
@@ -155,6 +173,17 @@ class MousePlayer_WC_Connection {
 		);
 
 		return $rows;
+	}
+
+	/**
+	 * A domain from the MousePlayer API: lower case, without www., only if it is a valid host name.
+	 *
+	 * @param string $domain Domain as sent by MousePlayer.
+	 * @return string Empty if it is not a host name.
+	 */
+	private static function clean_domain( $domain ) {
+		$domain = preg_replace( '/^www\./', '', strtolower( sanitize_text_field( $domain ) ) );
+		return preg_match( '/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/', $domain ) ? $domain : '';
 	}
 
 	/**

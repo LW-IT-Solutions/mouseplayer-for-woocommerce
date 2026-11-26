@@ -1,6 +1,7 @@
 <?php
 /**
- * Removes the settings, the last connection check and the purchase marks on orders.
+ * Removes the settings, the API key, the last connection check and the purchase marks on orders,
+ * on every site of a network.
  *
  * @package MousePlayer_For_WooCommerce
  */
@@ -9,17 +10,12 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
-delete_option( 'mouseplayer_wc_settings' );
-delete_option( 'mouseplayer_wc_since' );
-delete_transient( 'mouseplayer_wc_last_check' );
-
 /**
  * Remove the "purchase reported" mark from orders, through the WooCommerce API so that it works with
- * order tables (HPOS) and with posts. Runs only while WooCommerce is active.
+ * order tables (HPOS) and with posts. Without WooCommerce only orders stored as posts can be cleaned.
  */
 function mouseplayer_wc_uninstall_order_marks() {
 	if ( ! function_exists( 'wc_get_orders' ) ) {
-		// Orders stored as posts can still be cleaned without WooCommerce.
 		delete_post_meta_by_key( '_mouseplayer_wc_reported' );
 		return;
 	}
@@ -49,5 +45,30 @@ function mouseplayer_wc_uninstall_order_marks() {
 	}
 	delete_post_meta_by_key( '_mouseplayer_wc_reported' );
 }
-mouseplayer_wc_uninstall_order_marks();
-delete_option( 'mouseplayer_wc_since' );
+
+/**
+ * Everything the plugin stored on one site.
+ */
+function mouseplayer_wc_uninstall_site() {
+	// The order marks first: they need mouseplayer_wc_since.
+	mouseplayer_wc_uninstall_order_marks();
+	delete_option( 'mouseplayer_wc_settings' );
+	delete_option( 'mouseplayer_wc_api_key' );
+	delete_option( 'mouseplayer_wc_since' );
+	delete_transient( 'mouseplayer_wc_last_check' );
+}
+
+if ( is_multisite() ) {
+	foreach ( get_sites(
+		array(
+			'fields' => 'ids',
+			'number' => 0,
+		)
+	) as $mouseplayer_wc_site_id ) {
+		switch_to_blog( $mouseplayer_wc_site_id );
+		mouseplayer_wc_uninstall_site();
+		restore_current_blog();
+	}
+} else {
+	mouseplayer_wc_uninstall_site();
+}

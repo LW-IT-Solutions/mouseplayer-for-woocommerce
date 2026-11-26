@@ -41,8 +41,8 @@ class MousePlayer_WC_Settings {
 	public function add_menu() {
 		$this->hook = (string) add_submenu_page(
 			'woocommerce',
-			__( 'MousePlayer', 'mouseplayer-for-woocommerce' ),
-			__( 'MousePlayer', 'mouseplayer-for-woocommerce' ),
+			esc_html__( 'MousePlayer', 'mouseplayer-for-woocommerce' ),
+			esc_html__( 'MousePlayer', 'mouseplayer-for-woocommerce' ),
 			'manage_options',
 			self::PAGE_SLUG,
 			array( $this, 'render_page' )
@@ -84,7 +84,7 @@ class MousePlayer_WC_Settings {
 			array(
 				'id'      => 'mouseplayer-wc-consent',
 				'title'   => __( 'Consent', 'mouseplayer-for-woocommerce' ),
-				'content' => '<p>' . esc_html__( 'MousePlayer never records without a positive consent signal. If no signal arrives, nothing is recorded. The safest setup is to let your consent tool block the snippet until the visitor agrees. Automatic detection reads the decision from Consented.eu, Usercentrics, Cookiebot, OneTrust, consentmanager, Borlabs Cookie and Complianz. With your own banner, call MousePlayer.setConsent(true) or setConsent(false). A Global Privacy Control signal of the browser always means no recording.', 'mouseplayer-for-woocommerce' ) . '</p>',
+				'content' => '<p>' . esc_html__( 'The MousePlayer script, loaded from mouseplayer.com, records nothing without a positive consent signal; if no signal arrives, nothing is recorded. Loading the script itself transmits the IP address and browser information of the visitor to MousePlayer. The safest setup is therefore to let your consent tool block the snippet until the visitor agrees. Automatic detection reads the decision from Consented.eu, Usercentrics, Cookiebot, OneTrust, consentmanager, Borlabs Cookie and Complianz. With your own banner, call MousePlayer.setConsent(true) or setConsent(false). The MousePlayer script treats a Global Privacy Control signal of the browser as no consent.', 'mouseplayer-for-woocommerce' ) . '</p>',
 			)
 		);
 		$screen->add_help_tab(
@@ -159,8 +159,8 @@ class MousePlayer_WC_Settings {
 	 */
 	public function section_intro( $section ) {
 		$texts = array(
-			'mouseplayer_wc_connection' => __( 'The Channel ID connects this shop with your MousePlayer project. Nothing is sent to MousePlayer until tracking is switched on.', 'mouseplayer-for-woocommerce' ),
-			'mouseplayer_wc_consent'    => __( 'Session replay needs the consent of your visitors. MousePlayer records nothing until it receives a positive consent signal.', 'mouseplayer-for-woocommerce' ),
+			'mouseplayer_wc_connection' => __( 'The Channel ID connects this shop with your MousePlayer project. No visitor data is sent to MousePlayer until tracking is switched on; before that, only a click on Check connection contacts MousePlayer.', 'mouseplayer-for-woocommerce' ),
+			'mouseplayer_wc_consent'    => __( 'Session replay needs the consent of your visitors. The MousePlayer script records nothing until it receives a positive consent signal.', 'mouseplayer-for-woocommerce' ),
 			'mouseplayer_wc_privacy'    => __( 'MousePlayer never records what is typed into password and payment fields. Card fields of most payment services run in their own frames and are not part of the recording.', 'mouseplayer-for-woocommerce' ),
 			'mouseplayer_wc_events'     => __( 'The six steps of the Standard Ecommerce Funnel in MousePlayer. They are only sent together with a recording, that is after consent.', 'mouseplayer-for-woocommerce' ),
 			'mouseplayer_wc_verify'     => __( 'Only needed if MousePlayer asks you to prove that you own this domain. The plugin then adds the verification meta element to the home page.', 'mouseplayer-for-woocommerce' ),
@@ -210,7 +210,7 @@ class MousePlayer_WC_Settings {
 
 		switch ( $key ) {
 			case 'enabled':
-				$this->checkbox( $s, 'enabled', __( 'Record sessions on this shop', 'mouseplayer-for-woocommerce' ), __( 'Adds the MousePlayer snippet to every page of the shop. Recording starts only after consent.', 'mouseplayer-for-woocommerce' ) );
+				$this->checkbox( $s, 'enabled', __( 'Record sessions on this shop', 'mouseplayer-for-woocommerce' ), __( 'Adds the MousePlayer snippet to every page of the shop. The MousePlayer script starts recording only after consent.', 'mouseplayer-for-woocommerce' ) );
 				break;
 
 			case 'channel_id':
@@ -293,7 +293,7 @@ class MousePlayer_WC_Settings {
 
 			case 'event_data':
 				$this->checkbox( $s, 'send_value', __( 'Send prices, order value and currency', 'mouseplayer-for-woocommerce' ), __( 'Needed for the revenue under the Purchase step of the funnel.', 'mouseplayer-for-woocommerce' ) );
-				$this->checkbox( $s, 'send_context', __( 'Send the page context', 'mouseplayer-for-woocommerce' ), __( 'Page type, product ID, category, stock status and cart size. MousePlayer uses it to describe sessions, for example "compared three products of the same category".', 'mouseplayer-for-woocommerce' ) );
+				$this->checkbox( $s, 'send_context', __( 'Send the page context', 'mouseplayer-for-woocommerce' ), __( 'Page type, product ID, category, stock status and cart size; with prices switched on also the product price, the cart value and the currency. MousePlayer uses it to describe sessions, for example "compared three products of the same category".', 'mouseplayer-for-woocommerce' ) );
 				break;
 
 			case 'verify_token':
@@ -334,12 +334,13 @@ class MousePlayer_WC_Settings {
 			add_settings_error( MOUSEPLAYER_WC_OPTION, 'host', __( 'The tracking host must be mouseplayer.com or one of its subdomains. The previous value was kept.', 'mouseplayer-for-woocommerce' ) );
 		}
 
+		// The API key lives in its own option that is not autoloaded (MOUSEPLAYER_WC_KEY_OPTION).
 		if ( ! empty( $input['api_key_remove'] ) ) {
-			$out['api_key'] = '';
+			delete_option( MOUSEPLAYER_WC_KEY_OPTION );
 		} elseif ( isset( $input['api_key'] ) && '' !== trim( (string) $input['api_key'] ) ) {
 			$key = trim( sanitize_text_field( (string) $input['api_key'] ) );
 			if ( preg_match( '/^mp_[a-z]{2,4}_[A-Za-z0-9]{16,128}$/', $key ) ) {
-				$out['api_key'] = $key;
+				update_option( MOUSEPLAYER_WC_KEY_OPTION, $key, false );
 			} else {
 				add_settings_error( MOUSEPLAYER_WC_OPTION, 'api_key', __( 'This does not look like a MousePlayer API key (it starts with mp_ro_ or mp_rw_). The key was not saved.', 'mouseplayer-for-woocommerce' ) );
 			}
@@ -375,6 +376,7 @@ class MousePlayer_WC_Settings {
 		// A changed setup makes the last connection check meaningless.
 		delete_transient( self::CHECK_KEY );
 
+		unset( $out['api_key'] );
 		return array_intersect_key( $out, mouseplayer_wc_defaults() );
 	}
 
@@ -413,10 +415,10 @@ class MousePlayer_WC_Settings {
 		if ( '' === (string) $s['channel_id'] ) {
 			$rows[] = array( 'error', __( 'Connection', 'mouseplayer-for-woocommerce' ), __( 'No Channel ID yet. Copy it from your MousePlayer project (Project > Code).', 'mouseplayer-for-woocommerce' ) );
 		} elseif ( empty( $s['enabled'] ) ) {
-			$rows[] = array( 'warning', __( 'Connection', 'mouseplayer-for-woocommerce' ), __( 'Channel ID saved, tracking is switched off. Nothing is sent to MousePlayer.', 'mouseplayer-for-woocommerce' ) );
+			$rows[] = array( 'warning', __( 'Connection', 'mouseplayer-for-woocommerce' ), __( 'Channel ID saved, tracking is switched off. No visitor data is sent to MousePlayer.', 'mouseplayer-for-woocommerce' ) );
 		} else {
 			/* translators: 1: Channel ID, 2: host name. */
-			$rows[] = array( 'ok', __( 'Connection', 'mouseplayer-for-woocommerce' ), sprintf( __( 'Tracking is on for channel %1$s via %2$s.', 'mouseplayer-for-woocommerce' ), $s['channel_id'], $s['host'] ) );
+			$rows[] = array( 'ok', __( 'Connection', 'mouseplayer-for-woocommerce' ), sprintf( __( 'Tracking is on for channel %1$s via %2$s.', 'mouseplayer-for-woocommerce' ), $s['channel_id'], MousePlayer_WC_Connection::tracking_host( $s ) ) );
 		}
 
 		if ( 'cmp_block' === $s['consent_mode'] ) {
@@ -491,7 +493,7 @@ class MousePlayer_WC_Settings {
 		?>
 		<div class="wrap mouseplayer-wc">
 			<h1><?php esc_html_e( 'MousePlayer for WooCommerce', 'mouseplayer-for-woocommerce' ); ?></h1>
-			<p class="mouseplayer-wc-lead"><?php esc_html_e( 'Session replay, heatmaps and the ecommerce funnel for this shop. MousePlayer is an external service: this plugin sends visitor interactions to it only when tracking is switched on and the visitor has consented.', 'mouseplayer-for-woocommerce' ); ?>
+			<p class="mouseplayer-wc-lead"><?php esc_html_e( 'Session replay, heatmaps and the ecommerce funnel for this shop. MousePlayer is an external service. When tracking is switched on, every shop page loads the MousePlayer script from mouseplayer.com - with the blocking consent option only after consent, otherwise with the page, which transmits the IP address and browser information of the visitor. Recordings and shop events are sent only after the visitor has consented.', 'mouseplayer-for-woocommerce' ); ?>
 				<a href="<?php echo esc_url( mouseplayer_wc_site_url( '/en/company/privacy-policy' ) ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Privacy policy', 'mouseplayer-for-woocommerce' ); ?></a> &middot;
 				<a href="<?php echo esc_url( mouseplayer_wc_site_url( '/en/company/terms-of-service' ) ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Terms of service', 'mouseplayer-for-woocommerce' ); ?></a>
 			</p>
@@ -528,7 +530,7 @@ class MousePlayer_WC_Settings {
 					<input type="hidden" name="action" value="mouseplayer_wc_check" />
 					<?php wp_nonce_field( 'mouseplayer_wc_check' ); ?>
 					<?php submit_button( __( 'Check connection', 'mouseplayer-for-woocommerce' ), 'secondary', 'submit', false, '' === (string) $s['channel_id'] ? array( 'disabled' => 'disabled' ) : array() ); ?>
-					<span class="description"><?php esc_html_e( 'Asks MousePlayer whether the tracking script is reachable and, with an API key, whether the project receives recordings.', 'mouseplayer-for-woocommerce' ); ?></span>
+					<span class="description"><?php esc_html_e( 'Only on click: your server asks MousePlayer whether the tracking script is reachable and, with an API key, sends the key and the Channel ID to ask whether the project receives recordings. No visitor data is sent.', 'mouseplayer-for-woocommerce' ); ?></span>
 				</form>
 				<p class="mouseplayer-wc-privacy-hint">
 					<?php

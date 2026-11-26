@@ -4,7 +4,7 @@ Tags: woocommerce, session replay, heatmaps, conversion funnel, analytics
 Requires at least: 6.5
 Tested up to: 7.2
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -17,11 +17,11 @@ Session replay and heatmaps for WooCommerce, with consent handling, masked check
 **What the plugin does**
 
 * **Adds the MousePlayer snippet** to every page of the shop once you enter the Channel ID of your MousePlayer project and switch tracking on.
-* **Waits for consent.** MousePlayer records nothing until it receives a positive consent signal. Choose how the signal comes: your consent tool blocks the snippet until the visitor agrees (Consented.eu, Usercentrics, Cookiebot, OneTrust, consentmanager, Borlabs Cookie, Complianz), the WP Consent API, or automatic detection and your own banner. A Global Privacy Control signal of the browser always means no recording.
+* **Waits for consent.** The MousePlayer script, loaded from mouseplayer.com, records nothing until it receives a positive consent signal, and the plugin hands shop events to it only after that. Choose how the signal comes: your consent tool blocks the snippet until the visitor agrees (Consented.eu, Usercentrics, Cookiebot, OneTrust, consentmanager, Borlabs Cookie, Complianz), the WP Consent API, or automatic detection and your own banner. The MousePlayer script treats a Global Privacy Control signal of the browser as no consent.
 * **Masks checkout, order confirmation, order tracking and My Account.** The content of these pages is replaced by asterisks in the browser before anything is sent: names, addresses, email addresses and order details stay in the shop. Optionally the cart page as well. Works with the classic shortcodes and with the cart, checkout and order confirmation blocks.
-* **Keeps typing out of the recording.** Typing in checkout, address and account fields is not recorded at all. Independently of this plugin, MousePlayer never records what is typed into password or payment fields, and the card fields of most payment services run in their own frames.
+* **Keeps typing out of the recording.** Typing in checkout, address and account fields (classic and block checkout, login, registration, account details, addresses, order tracking) is not recorded at all. Independently of this plugin, MousePlayer never records what is typed into password or payment fields, and the card fields of most payment services run in their own frames.
 * **Sends the six ecommerce events** that make up the Standard Ecommerce Funnel in MousePlayer: `view_item_list`, `select_item`, `view_item`, `add_to_cart`, `begin_checkout` and `purchase`, with prices, order value and currency if you want. `add_to_cart` works on product pages, with AJAX buttons and with the product blocks. `purchase` is sent once per order, only for orders that were not cancelled or failed.
-* **Sends the page context** (page type, product ID, category, stock status, cart size), which MousePlayer uses to describe sessions.
+* **Sends the page context** (page type, product ID, category, stock status, cart size; with prices switched on also product price, cart value and currency), which MousePlayer uses to describe sessions.
 * **Excludes your team.** Logged-in users with the roles you choose (by default administrators and shop managers) are never recorded.
 * **Shows the status** of the setup and checks the connection on request. With a read-only API key (Business and Enterprise plans) the check confirms the project, its domain and the latest recording.
 * **Helps with the domain verification** of MousePlayer by adding the verification meta element to the home page.
@@ -31,14 +31,14 @@ You need a MousePlayer account (a free plan is available) and a project for the 
 
 == External services ==
 
-This plugin connects your shop to **MousePlayer**, a session replay and analytics service operated by the provider of www.mouseplayer.com. It is needed for the purpose of the plugin: recording sessions and showing them to you in MousePlayer.
+This plugin connects your shop to **MousePlayer**, a session replay and analytics service operated by LW IT Solutions Company Lukas Wójcik, Łódź, Poland (www.mouseplayer.com). It is needed for the purpose of the plugin: recording sessions and showing them to you in MousePlayer.
 
 **What is sent and when**
 
-* Nothing is sent while tracking is switched off or no Channel ID is set.
-* When tracking is on, every front-end page of the shop loads the MousePlayer script from `https://www.mouseplayer.com/mp.js` (or the MousePlayer host you entered), unless the visitor is a logged-in user with an excluded role. Loading the script transmits the visitor's IP address and browser information to MousePlayer. If you choose the blocking option, the browser loads the script only after the visitor has agreed in your consent tool.
-* After the visitor has consented, the script sends the recording to MousePlayer: page addresses, the content of the pages as the visitor sees them (masked areas replaced by asterisks), clicks, taps, scrolling, mouse movements, window size, browser and device characteristics, the referrer, and a random visitor ID stored in the browser's local storage. Depending on your settings it also sends the shop events with product IDs, product names, quantities, prices, order number, order value and currency, the page context, and a pseudonymous customer ID for logged-in customers (derived from the user ID and a secret key of your site, never the email address).
-* When you click "Check connection" on the settings page, your server asks `https://www.mouseplayer.com/mp.js` whether the script is reachable. If you saved an API key, it also calls the MousePlayer REST API (`/api/v1/projects` and `/api/v1/projects/<channel>/sessions`) with that key. No visitor data is sent by this check.
+* No visitor data is sent while tracking is switched off or no Channel ID is set. The only request to MousePlayer then is "Check connection", and only when you click it (see below).
+* When tracking is on, every front-end page of the shop loads the MousePlayer script from `https://www.mouseplayer.com/mp.js` (or the MousePlayer host you entered), unless the visitor is a logged-in user with an excluded role. Loading the script transmits the visitor's IP address and browser information to MousePlayer. If you choose the blocking option, the browser loads the script only after the visitor has agreed in your consent tool; with the WP Consent API and with automatic detection the script loads with the page and waits for a consent signal before it records.
+* After the visitor has consented, the script sends the recording to MousePlayer: page addresses, the content of the pages as the visitor sees them (masked areas replaced by asterisks), clicks, taps, scrolling, mouse movements, window size, browser and device characteristics, the referrer, and a random visitor ID stored in the browser's local storage. Depending on your settings the plugin hands it the shop events with product IDs, SKUs, variation IDs, product names, the name of the product list or category, quantities and numbers of items, prices, order number, order value and currency, the page context (with prices switched on including product price, cart value and currency), and a pseudonymous customer ID for logged-in customers (derived from the user ID and a secret key of your site, never the email address). Once events have been handed over, the plugin keeps their IDs in the browser's session storage (key `mouseplayer_wc_sent`, until the tab is closed) so that none is sent twice.
+* When you click "Check connection" on the settings page, your server sends a HEAD request to `https://www.mouseplayer.com/mp.js` (or the MousePlayer host you entered) to see whether the script is reachable. If you saved an API key, it also calls the MousePlayer REST API (`/api/v1/projects` and `/api/v1/projects/<channel ID>/sessions`) with that key and your Channel ID. Like every request WordPress makes, these carry your site address in the user agent. No visitor data is sent by this check.
 * The shortcode `[mouseplayer_privacy_link]` links to `https://www.mouseplayer.com/my-data`; the visitor's browser opens it only when the visitor clicks the link.
 
 Terms of service: https://www.mouseplayer.com/en/company/terms-of-service
@@ -78,7 +78,7 @@ Yes. Add the attribute `data-mp-mask` to any element to replace its content with
 
 = Will reloading the order confirmation page count the order twice? =
 
-No. Each order is marked when its purchase has been handed to MousePlayer, and a reload does not send it again. Failed, cancelled and unpaid pending orders are not reported; the filter `mouseplayer_wc_purchase_statuses` changes the list.
+No. Each order is marked when its confirmation page is shown for the first time, and a reload does not send the purchase again. If the visitor has not consented on that first view, the purchase is not sent at all. Failed, cancelled and unpaid pending orders are not reported; the filter `mouseplayer_wc_purchase_statuses` changes the list.
 
 = Does it work with page caching? =
 
@@ -100,6 +100,14 @@ Use the filter `mouseplayer_wc_is_active`, for example `add_filter( 'mouseplayer
 
 == Changelog ==
 
+= 1.0.1 =
+* Readme and settings texts describe exactly what is sent and when: which requests the MousePlayer script makes, what the plugin hands to it, and that Check connection contacts MousePlayer on click.
+* mp.js is loaded with wp_enqueue_script (async) unless a consent tool has to block the snippet.
+* Typing is kept out of the recording in all checkout and account forms, also without masking.
+* Event IDs are kept in the session storage only after the event has been handed to MousePlayer.
+* Answers of the MousePlayer API and add to cart data are sanitized where they are read.
+* The API key is stored in its own option that is not autoloaded. Uninstalling cleans every site of a network and all order marks.
+
 = 1.0.0 =
 * First release on WordPress.org.
 * Consent options: blocking by the consent tool, WP Consent API, automatic detection.
@@ -110,6 +118,9 @@ Use the filter `mouseplayer_wc_is_active`, for example `add_filter( 'mouseplayer
 * Excluded roles, status box, connection check with optional API key, domain verification, privacy policy text and privacy link shortcode.
 
 == Upgrade Notice ==
+
+= 1.0.1 =
+Exact texts about what is sent and when, mp.js loaded through wp_enqueue_script, typing kept out of all checkout and account forms. Your settings are kept.
 
 = 1.0.0 =
 First release.

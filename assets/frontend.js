@@ -11,18 +11,25 @@
 	var cfg = w.mouseplayerWc || {};
 	var SENT_KEY = 'mouseplayer_wc_sent';
 	var waiting = [];
+	// IDs of events that wait in this page, so that a refreshed cart fragment does not queue them twice.
+	var queued = {};
 
 	function ready() {
 		return !! ( w.MousePlayer && typeof w.MousePlayer.trackEvent === 'function' );
 	}
 
-	function track( name, params ) {
+	// Hands an event to MousePlayer, or keeps it in this page until the recording has started.
+	// Only an event that was handed over is remembered in the session storage (see remember()).
+	function track( name, params, id ) {
 		if ( ready() ) {
 			try {
 				w.MousePlayer.trackEvent( name, params );
+				if ( id ) {
+					remember( id );
+				}
 			} catch ( e ) {}
 		} else {
-			waiting.push( [ name, params ] );
+			waiting.push( [ name, params, id ] );
 		}
 	}
 
@@ -33,7 +40,7 @@
 		var list = waiting;
 		waiting = [];
 		for ( var i = 0; i < list.length; i++ ) {
-			track( list[ i ][ 0 ], list[ i ][ 1 ] );
+			track( list[ i ][ 0 ], list[ i ][ 1 ], list[ i ][ 2 ] );
 		}
 	}
 
@@ -46,7 +53,9 @@
 		} catch ( e ) {}
 	}
 
-	// IDs of events already handed over in this tab, so that a refreshed cart fragment is not sent twice.
+	// IDs of events already handed over to MousePlayer in this tab (session storage, key mouseplayer_wc_sent,
+	// at most 50), so that a refreshed cart fragment or a reload is not sent twice. Written only after
+	// MousePlayer has started recording, that is after consent.
 	function sentIds() {
 		try {
 			return JSON.parse( w.sessionStorage.getItem( SENT_KEY ) || '[]' ) || [];
@@ -73,13 +82,13 @@
 			if ( ! ev || typeof ev.n !== 'string' ) {
 				continue;
 			}
-			if ( ev.id && ids.indexOf( ev.id ) !== -1 ) {
+			if ( ev.id && ( ids.indexOf( ev.id ) !== -1 || queued[ ev.id ] ) ) {
 				continue;
 			}
-			track( ev.n, ev.p || {} );
 			if ( ev.id ) {
-				remember( ev.id );
+				queued[ ev.id ] = true;
 			}
+			track( ev.n, ev.p || {}, ev.id || '' );
 		}
 	}
 
@@ -165,9 +174,25 @@
 		}
 	}
 
-	// 6. Typing in masked areas (checkout, account) is not recorded at all, also in the block checkout.
+	// 6. Typing in checkout, address and account forms is not recorded at all - classic and block checkout,
+	// login, registration, lost password, account details, addresses and order tracking - and in every
+	// masked area. Independent of the masking setting.
 	if ( cfg.ignoreTyped ) {
-		var SEL = '[data-mp-mask] input, [data-mp-mask] textarea, [data-mp-mask] select';
+		var ROOTS = [
+			'[data-mp-mask]',
+			'form.checkout',
+			'.wc-block-checkout',
+			'.wp-block-woocommerce-checkout',
+			'.woocommerce-form-login',
+			'.woocommerce-form-register',
+			'.woocommerce-ResetPassword',
+			'.woocommerce-EditAccountForm',
+			'.woocommerce-address-fields',
+			'.woocommerce-form-track-order'
+		];
+		var SEL = ROOTS.map( function ( r ) {
+			return r + ' input, ' + r + ' textarea, ' + r + ' select';
+		} ).join( ', ' );
 		var mark = function ( root ) {
 			var list = ( root || d ).querySelectorAll( SEL );
 			for ( var i = 0; i < list.length; i++ ) {
@@ -178,7 +203,7 @@
 		};
 		var start = function () {
 			mark( d );
-			if ( typeof w.MutationObserver === 'function' && d.querySelector( '[data-mp-mask]' ) ) {
+			if ( typeof w.MutationObserver === 'function' && d.querySelector( ROOTS.join( ', ' ) ) ) {
 				var waiting = false;
 				new w.MutationObserver( function () {
 					if ( waiting ) {

@@ -1,13 +1,14 @@
 <?php
 /**
  * Plugin Name:       MousePlayer for WooCommerce
- * Plugin URI:        https://www.mouseplayer.com/
+ * Plugin URI:        https://github.com/LW-IT-Solutions/mouseplayer-for-woocommerce
  * Description:       Session replay and heatmaps from MousePlayer for WooCommerce, with consent handling, masking of checkout and account pages, and the six ecommerce funnel events.
- * Version:           1.0.0
+ * Version:           1.0.1
  * Requires at least: 6.5
  * Requires PHP:      7.4
  * Requires Plugins:  woocommerce
- * Author:            MousePlayer
+ * Author:            LW IT Solutions Company
+ * Author URI:        https://www.mouseplayer.com/
  * License:           GPLv2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       mouseplayer-for-woocommerce
@@ -21,11 +22,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'MOUSEPLAYER_WC_VERSION', '1.0.0' );
+define( 'MOUSEPLAYER_WC_VERSION', '1.0.1' );
 define( 'MOUSEPLAYER_WC_FILE', __FILE__ );
 define( 'MOUSEPLAYER_WC_PATH', plugin_dir_path( __FILE__ ) );
 define( 'MOUSEPLAYER_WC_URL', plugin_dir_url( __FILE__ ) );
 define( 'MOUSEPLAYER_WC_OPTION', 'mouseplayer_wc_settings' );
+define( 'MOUSEPLAYER_WC_KEY_OPTION', 'mouseplayer_wc_api_key' );
 define( 'MOUSEPLAYER_WC_DEFAULT_HOST', 'www.mouseplayer.com' );
 
 /**
@@ -75,6 +77,10 @@ function mouseplayer_wc_defaults() {
 /**
  * Settings merged with the defaults.
  *
+ * The API key is kept in an option of its own that is not autoloaded
+ * (MOUSEPLAYER_WC_KEY_OPTION); version 1.0.0 stored it in the settings array,
+ * which is still read until mouseplayer_wc_move_api_key() has moved it.
+ *
  * @return array
  */
 function mouseplayer_wc_get_settings() {
@@ -82,8 +88,33 @@ function mouseplayer_wc_get_settings() {
 	if ( ! is_array( $saved ) ) {
 		$saved = array();
 	}
-	return wp_parse_args( $saved, mouseplayer_wc_defaults() );
+	$settings = wp_parse_args( $saved, mouseplayer_wc_defaults() );
+	$key      = (string) get_option( MOUSEPLAYER_WC_KEY_OPTION, '' );
+	if ( '' !== $key ) {
+		$settings['api_key'] = $key;
+	}
+	$settings['api_key'] = (string) $settings['api_key'];
+	return $settings;
 }
+
+/**
+ * Moves an API key saved by version 1.0.0 out of the autoloaded settings into
+ * its own option. Runs before the setting is registered, so that the
+ * settings sanitizer is not involved.
+ */
+function mouseplayer_wc_move_api_key() {
+	$saved = get_option( MOUSEPLAYER_WC_OPTION, array() );
+	if ( ! is_array( $saved ) || ! array_key_exists( 'api_key', $saved ) ) {
+		return;
+	}
+	$key = sanitize_text_field( (string) $saved['api_key'] );
+	if ( '' !== $key && '' === (string) get_option( MOUSEPLAYER_WC_KEY_OPTION, '' ) ) {
+		update_option( MOUSEPLAYER_WC_KEY_OPTION, $key, false );
+	}
+	unset( $saved['api_key'] );
+	update_option( MOUSEPLAYER_WC_OPTION, $saved );
+}
+add_action( 'admin_init', 'mouseplayer_wc_move_api_key', 5 );
 
 /**
  * Consent tools and the script attributes MousePlayer documents for blocking the snippet until consent.
@@ -228,9 +259,9 @@ function mouseplayer_wc_privacy_policy_content() {
 	if ( ! function_exists( 'wp_add_privacy_policy_content' ) ) {
 		return;
 	}
-	$text  = '<p class="privacy-policy-tutorial">' . esc_html__( 'MousePlayer for WooCommerce sends data to MousePlayer only after the visitor has consented. Adapt the text below to your consent tool and your settings.', 'mouseplayer-for-woocommerce' ) . '</p>';
+	$text  = '<p class="privacy-policy-tutorial">' . esc_html__( 'With tracking switched on, every shop page loads the MousePlayer script from mouseplayer.com, which transmits the visitor\'s IP address and browser information to MousePlayer. With the option "My consent tool blocks the snippet" this happens only after consent; with the other consent options the script loads with the page and waits. The MousePlayer script records the visit and the plugin hands shop events to it only after the visitor has consented. Adapt the text below to your consent tool and your settings.', 'mouseplayer-for-woocommerce' ) . '</p>';
 	$text .= '<p><strong class="privacy-policy-tutorial">' . esc_html__( 'Suggested text:', 'mouseplayer-for-woocommerce' ) . ' </strong>';
-	$text .= esc_html__( 'With your consent, this shop uses MousePlayer, a session replay and analytics service, to understand how visitors use the shop. MousePlayer records page views, clicks, scrolling, mouse movements and the content of the pages as you see them, together with browser, device and approximate location derived from the IP address. Typed text in checkout and account forms is not recorded, and the content of the checkout, order confirmation and account pages is masked before it leaves your browser. What is typed into password and payment fields is never recorded. If enabled, the shop also sends shopping steps such as product views, add to cart, checkout and purchase with order value and currency. MousePlayer stores a random visitor ID in your browser\'s local storage. You can withdraw your consent at any time in the consent settings of this shop.', 'mouseplayer-for-woocommerce' ) . '</p>';
+	$text .= esc_html__( 'With your consent, this shop uses MousePlayer, a session replay and analytics service, to understand how visitors use the shop. MousePlayer records page views, clicks, scrolling, mouse movements and the content of the pages as you see them, together with browser, device and approximate location derived from the IP address. Typed text in checkout and account forms is not recorded, and the content of the checkout, order confirmation and account pages is masked before it leaves your browser. What is typed into password and payment fields is never recorded. If enabled, the shop also sends shopping steps such as product views, add to cart, checkout and purchase with order value and currency. MousePlayer stores a random visitor ID in your browser\'s local storage, and the shop keeps the IDs of shopping steps already sent in your browser\'s session storage until the tab is closed, so that none is sent twice. You can withdraw your consent at any time in the consent settings of this shop.', 'mouseplayer-for-woocommerce' ) . '</p>';
 	$text .= '<p>' . sprintf(
 		/* translators: 1: MousePlayer privacy policy URL, 2: MousePlayer self-service data access URL. */
 		wp_kses_post( __( 'Privacy policy of MousePlayer: <a href="%1$s">%1$s</a>. Visitors can see the data recorded about their browser at <a href="%2$s">%2$s</a>; the shortcode [mouseplayer_privacy_link] prints a link that already contains the visitor ID of the current browser.', 'mouseplayer-for-woocommerce' ) ),

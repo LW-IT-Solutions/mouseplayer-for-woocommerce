@@ -39,6 +39,13 @@ class MousePlayer_WC_Tracker {
 	private $context = array();
 
 	/**
+	 * Attributes of the blocked snippet, when a consent tool has to release it (see enqueue()).
+	 *
+	 * @var array|null
+	 */
+	private $blocked_snippet = null;
+
+	/**
 	 * Register hooks.
 	 */
 	public function __construct() {
@@ -74,7 +81,7 @@ class MousePlayer_WC_Tracker {
 	}
 
 	/**
-	 * Domain verification meta element and the snippet, as early as possible in the head.
+	 * Domain verification meta element, and the blocked snippet for a consent tool (see enqueue()).
 	 */
 	public function print_head() {
 		$s = mouseplayer_wc_get_settings();
@@ -83,10 +90,28 @@ class MousePlayer_WC_Tracker {
 			echo '<meta name="mouseplayer-verify" content="' . esc_attr( $s['verify_token'] ) . '" />' . "\n";
 		}
 
-		if ( ! mouseplayer_wc_is_active() ) {
+		if ( null === $this->blocked_snippet || ! mouseplayer_wc_is_active() ) {
 			return;
 		}
 
+		// The consent tool keeps this element inert (for example type="text/plain") and runs it only after the
+		// visitor has agreed; only then it adds mp.js from the MousePlayer host to the page.
+		$js = $this->config_js( $s )
+			. '(function(d,s){var f=d.getElementsByTagName(s)[0],j=d.createElement(s);'
+			. 'j.async=true;j.src=' . wp_json_encode( MousePlayer_WC_Connection::script_url( MousePlayer_WC_Connection::tracking_host( $s ) ) ) . ';'
+			. 'f.parentNode.insertBefore(j,f);})(document,"script");';
+
+		wp_print_inline_script_tag( $js, $this->blocked_snippet );
+	}
+
+	/**
+	 * Configuration that mp.js reads: window.mp_config, the command queue window.mp and window.mp_channelid.
+	 * These global names are the documented interface of mp.js and cannot be renamed by the plugin.
+	 *
+	 * @param array $s Settings.
+	 * @return string JavaScript.
+	 */
+	private function config_js( $s ) {
 		$config = array(
 			'channel' => (string) $s['channel_id'],
 			'mode'    => 'web_only',
@@ -95,13 +120,18 @@ class MousePlayer_WC_Tracker {
 			// A stable pseudonym, never the email address or the user ID itself.
 			$config['user_id'] = 'wp_' . substr( hash_hmac( 'sha256', (string) get_current_user_id(), wp_salt( 'auth' ) ), 0, 32 );
 		}
-
-		$js = 'window.mp_config=' . wp_json_encode( $config ) . ';'
+		return 'window.mp_config=' . wp_json_encode( $config ) . ';'
 			. 'window.mp=window.mp||function(){(window.mp.q=window.mp.q||[]).push(arguments);};'
-			. '(function(w,d,s,id){w.mp_channelid=id;var f=d.getElementsByTagName(s)[0],j=d.createElement(s);'
-			. 'j.async=true;j.src=' . wp_json_encode( MousePlayer_WC_Connection::script_url( $s['host'] ) ) . ';'
-			. 'f.parentNode.insertBefore(j,f);})(window,document,"script",' . wp_json_encode( (string) $s['channel_id'] ) . ');';
+			. 'window.mp_channelid=' . wp_json_encode( (string) $s['channel_id'] ) . ';';
+	}
 
+	/**
+	 * Attributes of the snippet element: those of the chosen consent tool, if it blocks the snippet.
+	 *
+	 * @param array $s Settings.
+	 * @return array
+	 */
+	private function snippet_attributes( $s ) {
 		$attributes = array( 'id' => 'mouseplayer-snippet' );
 		$cmps       = mouseplayer_wc_cmps();
 		if ( 'cmp_block' === $s['consent_mode'] && isset( $cmps[ $s['consent_cmp'] ]['attributes'] ) ) {
@@ -114,18 +144,40 @@ class MousePlayer_WC_Tracker {
 		 * @param array $attributes Attribute name => value.
 		 * @param array $s          Plugin settings.
 		 */
-		$attributes = (array) apply_filters( 'mouseplayer_wc_script_attributes', $attributes, $s );
-
-		wp_print_inline_script_tag( $js, $attributes );
+		return (array) apply_filters( 'mouseplayer_wc_script_attributes', $attributes, $s );
 	}
 
 	/**
-	 * Register the event script. The data is added in the footer, after the page content has run.
+	 * Load mp.js and the event script.
+	 *
+	 * Without blocking attributes, mp.js from the MousePlayer host is enqueued (async, in the head) with its
+	 * configuration as an inline script before it. If a consent tool has to block it, the snippet is printed
+	 * as one blocked inline element in print_head() instead, because consent tools release such elements.
+	 * The data for the event script is added in the footer, after the page content has run.
 	 */
 	public function enqueue() {
 		if ( ! mouseplayer_wc_is_active() ) {
 			return;
 		}
+		$s          = mouseplayer_wc_get_settings();
+		$attributes = $this->snippet_attributes( $s );
+		if ( array( 'id' => 'mouseplayer-snippet' ) === $attributes ) {
+			// phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion -- mp.js is the remote script of the service and is versioned by MousePlayer; the plugin adds no ver parameter to it.
+			wp_enqueue_script(
+				'mouseplayer-wc-mp',
+				MousePlayer_WC_Connection::script_url( MousePlayer_WC_Connection::tracking_host( $s ) ),
+				array(),
+				null,
+				array(
+					'in_footer' => false,
+					'strategy'  => 'async',
+				)
+			);
+			wp_add_inline_script( 'mouseplayer-wc-mp', $this->config_js( $s ), 'before' );
+		} else {
+			$this->blocked_snippet = $attributes;
+		}
+
 		wp_enqueue_script(
 			'mouseplayer-wc',
 			MOUSEPLAYER_WC_URL . 'assets/frontend.js',
@@ -286,7 +338,10 @@ class MousePlayer_WC_Tracker {
 	 * @param int    $variation_id  Variation ID.
 	 */
 	public function on_add_to_cart( $cart_item_key, $product_id, $quantity, $variation_id ) {
-		if ( ! $this->may_queue( 'ev_add_to_cart' ) || ! WC()->session ) {
+		$product_id   = absint( $product_id );
+		$variation_id = absint( $variation_id );
+		$quantity     = max( 0, (int) $quantity );
+		if ( ! $product_id || ! $this->may_queue( 'ev_add_to_cart' ) || ! WC()->session ) {
 			return;
 		}
 		$product = wc_get_product( $variation_id ? $variation_id : $product_id );
@@ -366,7 +421,8 @@ class MousePlayer_WC_Tracker {
 			return;
 		}
 
-		// A reload of the confirmation page must not report the order again.
+		// The order is marked when its confirmation page is generated for the first time; a reload does not
+		// hand the purchase over again. If the visitor has not consented on that page, it is not sent at all.
 		$order->update_meta_data( self::ORDER_META, gmdate( 'c' ) );
 		$order->save_meta_data();
 
