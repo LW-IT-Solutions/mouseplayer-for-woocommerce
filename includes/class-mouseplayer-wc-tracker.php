@@ -162,12 +162,12 @@ class MousePlayer_WC_Tracker {
 		$s          = mouseplayer_wc_get_settings();
 		$attributes = $this->snippet_attributes( $s );
 		if ( array( 'id' => 'mouseplayer-snippet' ) === $attributes ) {
-			// phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion -- mp.js is the remote script of the service and is versioned by MousePlayer; the plugin adds no ver parameter to it.
+			// mp.js is the remote script of the service and is versioned by MousePlayer; the plugin adds no ver parameter to it.
 			wp_enqueue_script(
 				'mouseplayer-wc-mp',
 				MousePlayer_WC_Connection::script_url( MousePlayer_WC_Connection::tracking_host( $s ) ),
 				array(),
-				null,
+				null, // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion -- remote script of the service, versioned by MousePlayer.
 				array(
 					'in_footer' => false,
 					'strategy'  => 'async',
