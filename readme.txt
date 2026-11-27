@@ -4,7 +4,7 @@ Tags: woocommerce, session replay, heatmaps, conversion funnel, analytics
 Requires at least: 6.5
 Tested up to: 7.2
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -100,6 +100,14 @@ Use the filter `mouseplayer_wc_is_active`, for example `add_filter( 'mouseplayer
 
 == Changelog ==
 
+= 1.2.0 =
+* Consent: a time line per consent option shows when the MousePlayer script loads (and with it the IP address and browser information) and when recording starts.
+* Privacy: a preview of what a recording shows of the checkout and the cart follows the masking options, including typing that is not recorded.
+* Do not record: every role shows its number of user accounts, and a bar counts the accounts that are never recorded. The checkbox has room again and the text has the size of the rest of the page.
+* Data sent with events: an example of a product page view shows which keys are sent and which are left out with the current settings.
+* Funnel: a click on a step switches its event, a tooltip names the event and where it is sent, and the bars grow once when they come into view (not with reduced motion).
+* Select fields no longer put their arrow right next to the text. No change to what is sent.
+
 = 1.1.0 =
 * Settings page: a status badge next to the title, tiles for connection, consent, privacy and shop events, and a section menu that stays in view.
 * Every settings section is a card with an icon; the save button stays reachable at the bottom while scrolling.
@@ -126,6 +134,9 @@ Use the filter `mouseplayer_wc_is_active`, for example `add_filter( 'mouseplayer
 * Excluded roles, status box, connection check with optional API key, domain verification, privacy policy text and privacy link shortcode.
 
 == Upgrade Notice ==
+
+= 1.2.0 =
+Consent time line, masking preview, event example and account counts per role. No change to what is sent.
 
 = 1.1.0 =
 Clearer settings page with status tiles and a funnel diagram. No change to what is sent.

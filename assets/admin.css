@@ -480,6 +480,7 @@
 	}
 
 	.mouseplayer-wc-check .description {
+		width: auto !important;
 		margin-left: 32px;
 	}
 
@@ -514,5 +515,510 @@
 	.mouseplayer-wc-switch::after,
 	.mouseplayer-wc-funnel-bar {
 		transition: none;
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/* 1.2.0                                                               */
+/* ------------------------------------------------------------------ */
+
+/* Select fields: the arrow no longer sits right next to the text. */
+.wp-core-ui .mouseplayer-wc select {
+	padding-right: 36px;
+}
+
+/* Role pills: room for the checkbox, same text size as the rest, account count. */
+.mouseplayer-wc .form-table td fieldset label.mouseplayer-wc-role {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 8px 8px 0 !important;
+	padding: 7px 10px 7px 12px;
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+.mouseplayer-wc-role input[type="checkbox"] {
+	flex: none;
+	margin: 0 !important;
+}
+
+.mouseplayer-wc-role-name {
+	flex: 1 1 auto;
+}
+
+.mouseplayer-wc-role-count {
+	flex: none;
+	min-width: 18px;
+	padding: 0 6px;
+	border-radius: 999px;
+	background: #f0f0f1;
+	color: #50575e;
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 18px;
+	text-align: center;
+}
+
+.mouseplayer-wc-role:has(input:checked) .mouseplayer-wc-role-count {
+	background: var(--mpwc-accent);
+	color: #fff;
+}
+
+.mouseplayer-wc-roles-meter {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 12px;
+	margin: 4px 0 8px;
+}
+
+.mouseplayer-wc-meter {
+	display: block;
+	width: 180px;
+	height: 8px;
+	border-radius: 4px;
+	background: #f0f0f1;
+	overflow: hidden;
+}
+
+.mouseplayer-wc-meter-fill {
+	display: block;
+	height: 100%;
+	background: var(--mpwc-accent);
+	transition: width .3s ease-out;
+}
+
+.mouseplayer-wc-meter-text {
+	font-weight: 600;
+	color: #3c434a;
+}
+
+/* Consent time line */
+.mouseplayer-wc-timeline {
+	margin: 14px 0 0;
+	padding: 12px 14px;
+	border-radius: 8px;
+	background: #f6f7f7;
+	--mpwc-consent: 38%;
+}
+
+.mouseplayer-wc-timeline-title {
+	margin: 0 0 8px;
+	font-weight: 600;
+}
+
+.mouseplayer-wc-tl-axis,
+.mouseplayer-wc-tl-track {
+	position: relative;
+	display: block;
+	margin-left: 230px;
+}
+
+.mouseplayer-wc-tl-axis {
+	height: 30px;
+	border-bottom: 2px solid #c3c4c7;
+}
+
+.mouseplayer-wc-tl-mark {
+	position: absolute;
+	bottom: 4px;
+	font-size: 11px;
+	line-height: 1.3;
+	color: #50575e;
+	white-space: nowrap;
+}
+
+.mouseplayer-wc-tl-mark::after {
+	content: "";
+	position: absolute;
+	bottom: -10px;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: #8c8f94;
+}
+
+.mouseplayer-wc-tl-open { left: 0; }
+.mouseplayer-wc-tl-open::after { left: -3px; }
+.mouseplayer-wc-tl-yes { left: var(--mpwc-consent); transform: translateX(-50%); color: #00691b; font-weight: 600; }
+.mouseplayer-wc-tl-yes::after { left: 50%; margin-left: -4px; background: #00a32a; }
+.mouseplayer-wc-tl-end { right: 0; }
+.mouseplayer-wc-tl-end::after { right: -3px; }
+
+.mouseplayer-wc-tl-row {
+	display: flex;
+	align-items: center;
+	margin: 10px 0 0;
+}
+
+.mouseplayer-wc-tl-label {
+	flex: 0 0 230px;
+	box-sizing: border-box;
+	padding-right: 12px;
+	font-size: 12px;
+	line-height: 1.35;
+	color: #3c434a;
+}
+
+.mouseplayer-wc-tl-row .mouseplayer-wc-tl-track {
+	flex: 1 1 auto;
+	height: 14px;
+	margin: 0;
+	border-radius: 7px;
+	background: repeating-linear-gradient(90deg, #dcdcde 0 6px, transparent 6px 10px);
+}
+
+.mouseplayer-wc-tl-bar {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	right: 0;
+	border-radius: 7px;
+	transition: left .45s cubic-bezier(.2, .8, .2, 1);
+}
+
+.mouseplayer-wc-tl-script {
+	left: 0;
+	background: #dba617;
+}
+
+.mouseplayer-wc-tl-rec {
+	left: var(--mpwc-consent);
+	background: var(--mpwc-accent);
+}
+
+.mouseplayer-wc-timeline[data-mode="cmp_block"] .mouseplayer-wc-tl-script {
+	left: var(--mpwc-consent);
+}
+
+.mouseplayer-wc-tl-text {
+	margin: 10px 0 0 !important;
+}
+
+/* Masking preview */
+.mouseplayer-wc-mask {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+	gap: 12px;
+	margin: 14px 0 4px;
+}
+
+.mouseplayer-wc-mask-box {
+	padding: 10px 12px;
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+	background: #1d2327;
+	color: #f0f0f1;
+}
+
+.mouseplayer-wc-mask-title {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0 0 8px !important;
+	font-weight: 600;
+	color: #fff;
+}
+
+.mouseplayer-wc-mask-title .dashicons {
+	color: #f86368;
+}
+
+.mouseplayer-wc-mask dl {
+	margin: 0;
+}
+
+.mouseplayer-wc-mask dl > div {
+	display: grid;
+	grid-template-columns: minmax(70px, 38%) minmax(0, 1fr);
+	gap: 8px;
+	padding: 4px 0;
+	border-top: 1px solid #2c3338;
+}
+
+.mouseplayer-wc-mask dt {
+	color: #a7aaad;
+	font-size: 12px;
+}
+
+.mouseplayer-wc-mask dd {
+	margin: 0;
+	overflow-wrap: anywhere;
+	font-family: Consolas, Monaco, monospace;
+	font-size: 12px;
+}
+
+.mouseplayer-wc-starred,
+.mouseplayer-wc-untyped,
+.mouseplayer-wc-state-on {
+	display: none;
+}
+
+.mouseplayer-wc-mask.mask-checkout .mouseplayer-wc-mask-checkout .mouseplayer-wc-clear,
+.mouseplayer-wc-mask.mask-cart .mouseplayer-wc-mask-cart .mouseplayer-wc-clear,
+.mouseplayer-wc-mask.ignore-typing .mouseplayer-wc-typed {
+	display: none;
+}
+
+.mouseplayer-wc-mask.mask-checkout .mouseplayer-wc-mask-checkout .mouseplayer-wc-starred,
+.mouseplayer-wc-mask.mask-cart .mouseplayer-wc-mask-cart .mouseplayer-wc-starred,
+.mouseplayer-wc-mask.ignore-typing .mouseplayer-wc-untyped {
+	display: inline;
+	color: #72aee6;
+}
+
+.mouseplayer-wc-untyped {
+	font-style: italic;
+}
+
+.mouseplayer-wc-typed i {
+	display: inline-block;
+	width: 1px;
+	height: 1em;
+	margin-left: 1px;
+	vertical-align: -2px;
+	background: #f0f0f1;
+	animation: mpwc-caret 1s steps(1) 6;
+}
+
+@keyframes mpwc-caret {
+	50% { opacity: 0; }
+}
+
+.mouseplayer-wc-mask-state {
+	margin: 8px 0 0 !important;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.mouseplayer-wc-state-off {
+	color: #f2d675;
+}
+
+.mouseplayer-wc-state-on {
+	color: #68de7c;
+}
+
+.mouseplayer-wc-mask.mask-checkout .mouseplayer-wc-mask-checkout .mouseplayer-wc-state-on,
+.mouseplayer-wc-mask.mask-cart .mouseplayer-wc-mask-cart .mouseplayer-wc-state-on {
+	display: inline;
+}
+
+.mouseplayer-wc-mask.mask-checkout .mouseplayer-wc-mask-checkout .mouseplayer-wc-state-off,
+.mouseplayer-wc-mask.mask-cart .mouseplayer-wc-mask-cart .mouseplayer-wc-state-off {
+	display: none;
+}
+
+/* Event example */
+.mouseplayer-wc-payload {
+	margin: 12px 0 0;
+}
+
+.mouseplayer-wc-payload-title {
+	margin: 0 0 6px !important;
+	font-weight: 600;
+}
+
+.mouseplayer-wc-code {
+	padding: 10px 12px;
+	border-radius: 8px;
+	background: #1d2327;
+	color: #f0f0f1;
+	font: 12px/1.7 Consolas, Monaco, monospace;
+	overflow-wrap: anywhere;
+}
+
+.mouseplayer-wc-code-head {
+	color: #a7aaad;
+}
+
+.mouseplayer-wc-code-head + .mouseplayer-wc-code-line,
+.mouseplayer-wc-code-line {
+	padding-left: 18px;
+	transition: opacity .25s, color .25s;
+}
+
+.mouseplayer-wc-code-head:not(:first-child) {
+	margin-top: 6px;
+}
+
+.mouseplayer-wc-code-key {
+	color: #9ec2e6;
+}
+
+.mouseplayer-wc-code-val {
+	color: #f2d675;
+}
+
+/* Lines that the current settings do not send. */
+.mouseplayer-wc-payload:not(.send-value) [data-need~="value"],
+.mouseplayer-wc-payload:not(.send-context) [data-need~="context"] {
+	opacity: .45;
+	text-decoration: line-through;
+}
+
+.mouseplayer-wc-payload:not(.send-value) [data-need~="value"] span,
+.mouseplayer-wc-payload:not(.send-context) [data-need~="context"] span {
+	color: #a7aaad;
+}
+
+.mouseplayer-wc-payload-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 14px;
+	margin: 6px 0 0 !important;
+	font-size: 12px;
+	color: #50575e;
+}
+
+.mouseplayer-wc-legend-on::before,
+.mouseplayer-wc-legend-off::before {
+	content: "";
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	margin-right: 4px;
+	border-radius: 2px;
+	vertical-align: -1px;
+	background: #f2d675;
+}
+
+.mouseplayer-wc-legend-off {
+	text-decoration: line-through;
+}
+
+.mouseplayer-wc-legend-off::before {
+	background: #a7aaad;
+}
+
+/* Funnel: steps are buttons with a tooltip, bars grow once. */
+.mouseplayer-wc-funnel li {
+	position: relative;
+}
+
+button.mouseplayer-wc-funnel-bar {
+	border: 0;
+	font: inherit;
+	cursor: pointer;
+}
+
+button.mouseplayer-wc-funnel-bar:disabled {
+	cursor: default;
+}
+
+button.mouseplayer-wc-funnel-bar:not(:disabled):hover {
+	filter: brightness(1.08);
+}
+
+.mouseplayer-wc-funnel li.is-off button.mouseplayer-wc-funnel-bar:not(:disabled):hover {
+	border-color: var(--mpwc-accent);
+	color: var(--mpwc-accent);
+}
+
+button.mouseplayer-wc-funnel-bar:focus-visible {
+	outline: 2px solid var(--mpwc-accent);
+	outline-offset: 2px;
+}
+
+.mouseplayer-wc-funnel-tip {
+	position: absolute;
+	left: 50%;
+	bottom: calc(100% + 4px);
+	z-index: 3;
+	width: max-content;
+	max-width: min(320px, 90vw);
+	padding: 5px 9px;
+	border-radius: 6px;
+	background: #1d2327;
+	color: #fff;
+	font-size: 12px;
+	line-height: 1.4;
+	opacity: 0;
+	visibility: hidden;
+	transform: translate(-50%, 3px);
+	pointer-events: none;
+}
+
+/* Without the script: hover or focus. With it (.has-tips): only the one step
+   in .tip-on, so mouse and keyboard never show two tooltips at once. Hiding
+   is instant, showing fades in. */
+.mouseplayer-wc-funnel:not(.has-tips) li:hover .mouseplayer-wc-funnel-tip,
+.mouseplayer-wc-funnel:not(.has-tips) li:focus-within .mouseplayer-wc-funnel-tip,
+.mouseplayer-wc-funnel.has-tips li.tip-on .mouseplayer-wc-funnel-tip {
+	opacity: 1;
+	visibility: visible;
+	transform: translate(-50%, 0);
+	transition: opacity .15s, transform .15s;
+}
+
+.mouseplayer-wc-funnel.is-waiting .mouseplayer-wc-funnel-bar {
+	transform: scaleX(.15);
+	opacity: 0;
+}
+
+.mouseplayer-wc-funnel.is-growing .mouseplayer-wc-funnel-bar {
+	animation: mpwc-grow .6s cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.mouseplayer-wc-funnel.is-growing li:nth-child(2) .mouseplayer-wc-funnel-bar { animation-delay: .06s; }
+.mouseplayer-wc-funnel.is-growing li:nth-child(3) .mouseplayer-wc-funnel-bar { animation-delay: .12s; }
+.mouseplayer-wc-funnel.is-growing li:nth-child(4) .mouseplayer-wc-funnel-bar { animation-delay: .18s; }
+.mouseplayer-wc-funnel.is-growing li:nth-child(5) .mouseplayer-wc-funnel-bar { animation-delay: .24s; }
+.mouseplayer-wc-funnel.is-growing li:nth-child(6) .mouseplayer-wc-funnel-bar { animation-delay: .3s; }
+
+@keyframes mpwc-grow {
+	from {
+		transform: scaleX(.15);
+		opacity: 0;
+	}
+	to {
+		transform: none;
+		opacity: 1;
+	}
+}
+
+@media screen and (max-width: 782px) {
+	.mouseplayer-wc .form-table td fieldset label.mouseplayer-wc-role {
+		width: calc(50% - 8px);
+		min-width: 0;
+	}
+
+	.mouseplayer-wc-tl-axis {
+		margin-left: 0;
+		margin-top: 4px;
+	}
+
+	.mouseplayer-wc-tl-row {
+		flex-wrap: wrap;
+	}
+
+	.mouseplayer-wc-tl-label {
+		flex-basis: 100%;
+		padding: 0 0 4px;
+	}
+
+	.mouseplayer-wc-tl-row .mouseplayer-wc-tl-track {
+		flex-basis: 100%;
+	}
+
+	.mouseplayer-wc-tl-mark {
+		font-size: 10px;
+		white-space: normal;
+		max-width: 33%;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.mouseplayer-wc-tl-bar,
+	.mouseplayer-wc-meter-fill,
+	.mouseplayer-wc-code-line,
+	.mouseplayer-wc-funnel li .mouseplayer-wc-funnel-tip {
+		transition: none !important;
+	}
+
+	.mouseplayer-wc-typed i,
+	.mouseplayer-wc-funnel.is-growing .mouseplayer-wc-funnel-bar {
+		animation: none;
 	}
 }

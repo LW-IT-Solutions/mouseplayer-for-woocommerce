@@ -219,8 +219,141 @@ class MousePlayer_WC_Settings {
 	}
 
 	/**
+	 * Labels of the six event checkboxes: event name and where it is sent.
+	 *
+	 * @return array Setting key => label.
+	 */
+	private function event_labels() {
+		return array(
+			'ev_view_item_list' => __( 'view_item_list: shop, category, tag and product search pages', 'mouseplayer-for-woocommerce' ),
+			'ev_select_item'    => __( 'select_item: click on a product in a list', 'mouseplayer-for-woocommerce' ),
+			'ev_view_item'      => __( 'view_item: product page', 'mouseplayer-for-woocommerce' ),
+			'ev_add_to_cart'    => __( 'add_to_cart: product page, lists and blocks', 'mouseplayer-for-woocommerce' ),
+			'ev_begin_checkout' => __( 'begin_checkout: checkout page with a filled cart', 'mouseplayer-for-woocommerce' ),
+			'ev_purchase'       => __( 'purchase: order confirmation, once per order', 'mouseplayer-for-woocommerce' ),
+		);
+	}
+
+	/**
+	 * When the MousePlayer script loads and when recording starts, per consent
+	 * option, as two bars on a time line (page opened - consent - page left).
+	 * admin.js follows the radio buttons.
+	 *
+	 * @param string $mode Saved consent mode.
+	 */
+	private function consent_timeline( $mode ) {
+		$mode = in_array( $mode, array( 'cmp_block', 'wp_consent_api', 'auto' ), true ) ? $mode : 'auto';
+		echo '<div class="mouseplayer-wc-timeline" id="mouseplayer-wc-timeline" data-mode="' . esc_attr( $mode ) . '">';
+		echo '<p class="mouseplayer-wc-timeline-title">' . esc_html__( 'On a visit', 'mouseplayer-for-woocommerce' ) . '</p>';
+		echo '<div class="mouseplayer-wc-tl-axis" aria-hidden="true"><span class="mouseplayer-wc-tl-mark mouseplayer-wc-tl-open">' . esc_html__( 'Page opened', 'mouseplayer-for-woocommerce' ) . '</span><span class="mouseplayer-wc-tl-mark mouseplayer-wc-tl-yes">' . esc_html__( 'Visitor consents', 'mouseplayer-for-woocommerce' ) . '</span><span class="mouseplayer-wc-tl-mark mouseplayer-wc-tl-end">' . esc_html__( 'Page left', 'mouseplayer-for-woocommerce' ) . '</span></div>';
+		echo '<div class="mouseplayer-wc-tl-row" aria-hidden="true"><span class="mouseplayer-wc-tl-label">' . esc_html__( 'Script from mouseplayer.com (IP address, browser)', 'mouseplayer-for-woocommerce' ) . '</span><span class="mouseplayer-wc-tl-track"><span class="mouseplayer-wc-tl-bar mouseplayer-wc-tl-script"></span></span></div>';
+		echo '<div class="mouseplayer-wc-tl-row" aria-hidden="true"><span class="mouseplayer-wc-tl-label">' . esc_html__( 'Recording and shop events', 'mouseplayer-for-woocommerce' ) . '</span><span class="mouseplayer-wc-tl-track"><span class="mouseplayer-wc-tl-bar mouseplayer-wc-tl-rec"></span></span></div>';
+		$texts = $this->timeline_texts();
+		echo '<p class="description mouseplayer-wc-tl-text" id="mouseplayer-wc-tl-text" aria-live="polite"';
+		foreach ( $texts as $key => $text ) {
+			echo ' data-' . esc_attr( str_replace( '_', '-', $key ) ) . '="' . esc_attr( $text ) . '"';
+		}
+		echo '>' . esc_html( $texts[ $mode ] ) . '</p></div>';
+	}
+
+	/**
+	 * The time line as a sentence, per consent option.
+	 *
+	 * @return array Mode => sentence.
+	 */
+	private function timeline_texts() {
+		return array(
+			'cmp_block'      => __( 'Before consent nothing loads from mouseplayer.com. After consent the script loads and recording starts.', 'mouseplayer-for-woocommerce' ),
+			'wp_consent_api' => __( 'The script loads with the page (IP address and browser information reach mouseplayer.com). Recording starts only after consent in the statistics category.', 'mouseplayer-for-woocommerce' ),
+			'auto'           => __( 'The script loads with the page (IP address and browser information reach mouseplayer.com) and waits. Recording starts only after a consent signal.', 'mouseplayer-for-woocommerce' ),
+		);
+	}
+
+	/**
+	 * What a recording shows of the checkout and the cart, with the masking
+	 * options applied. Made-up values; admin.js follows the checkboxes.
+	 *
+	 * @param array $s Settings.
+	 */
+	private function masking_preview( $s ) {
+		$star = function ( $text ) {
+			return preg_replace( '/\S/u', '*', $text );
+		};
+		$rows = array(
+			'checkout' => array(
+				__( 'Checkout in the recording', 'mouseplayer-for-woocommerce' ),
+				array(
+					array( __( 'Name', 'mouseplayer-for-woocommerce' ), __( 'Alex Example', 'mouseplayer-for-woocommerce' ) ),
+					array( __( 'Address', 'mouseplayer-for-woocommerce' ), __( '12 Example Street', 'mouseplayer-for-woocommerce' ) ),
+					array( __( 'Email', 'mouseplayer-for-woocommerce' ), 'alex@example.com' ),
+				),
+			),
+			'cart'     => array(
+				__( 'Cart in the recording', 'mouseplayer-for-woocommerce' ),
+				array(
+					array( __( 'Product', 'mouseplayer-for-woocommerce' ), __( 'Example product', 'mouseplayer-for-woocommerce' ) ),
+					array( __( 'Price', 'mouseplayer-for-woocommerce' ), '49.90' ),
+					array( __( 'Postcode', 'mouseplayer-for-woocommerce' ), '12345' ),
+				),
+			),
+		);
+		$cls = 'mouseplayer-wc-mask' . ( empty( $s['mask_checkout'] ) ? '' : ' mask-checkout' ) . ( empty( $s['mask_cart'] ) ? '' : ' mask-cart' ) . ( empty( $s['ignore_typing'] ) ? '' : ' ignore-typing' );
+		echo '<div class="' . esc_attr( $cls ) . '" id="mouseplayer-wc-mask">';
+		foreach ( $rows as $area => $box ) {
+			echo '<div class="mouseplayer-wc-mask-box mouseplayer-wc-mask-' . esc_attr( $area ) . '"><p class="mouseplayer-wc-mask-title"><span class="dashicons dashicons-video-alt3" aria-hidden="true"></span>' . esc_html( $box[0] ) . '</p><dl>';
+			foreach ( $box[1] as $row ) {
+				echo '<div><dt>' . esc_html( $row[0] ) . '</dt><dd><span class="mouseplayer-wc-clear">' . esc_html( $row[1] ) . '</span><span class="mouseplayer-wc-starred">' . esc_html( $star( $row[1] ) ) . '</span></dd></div>';
+			}
+			if ( 'checkout' === $area ) {
+				echo '<div class="mouseplayer-wc-mask-typing"><dt>' . esc_html__( 'Typed phone number', 'mouseplayer-for-woocommerce' ) . '</dt><dd><span class="mouseplayer-wc-typed">*********<i aria-hidden="true"></i></span><span class="mouseplayer-wc-untyped">' . esc_html__( 'not recorded', 'mouseplayer-for-woocommerce' ) . '</span></dd></div>';
+			}
+			echo '</dl><p class="mouseplayer-wc-mask-state"><span class="mouseplayer-wc-state-on">' . esc_html__( 'Masked before it leaves the browser', 'mouseplayer-for-woocommerce' ) . '</span><span class="mouseplayer-wc-state-off">' . esc_html__( 'Visible in the recording', 'mouseplayer-for-woocommerce' ) . '</span></p></div>';
+		}
+		echo '</div>';
+		echo '<p class="description">' . esc_html__( 'Example values. The preview follows the three options above.', 'mouseplayer-for-woocommerce' ) . '</p>';
+	}
+
+	/**
+	 * An example of what one shop event and the page context contain, with
+	 * the switches for prices and page context applied - the keys are those
+	 * the tracker sends on a product page. Made-up values.
+	 *
+	 * @param array $s Settings.
+	 */
+	private function payload_preview( $s ) {
+		$currency = function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : 'EUR';
+		$lines    = array(
+			array( '', 'view_item', '{' ),
+			array( '', 'item_id', '"123"' ),
+			array( '', 'item_name', '"' . __( 'Example product', 'mouseplayer-for-woocommerce' ) . '"' ),
+			array( '', 'sku', '"EX-123"' ),
+			array( 'value', 'price', '49.9' ),
+			array( 'value', 'currency', '"' . $currency . '"' ),
+			array( 'context', 'setContext', '{' ),
+			array( 'context', 'page_type', '"product"' ),
+			array( 'context', 'product_id', '"123"' ),
+			array( 'context', 'in_stock', 'true' ),
+			array( 'context', 'category', '"' . __( 'Example category', 'mouseplayer-for-woocommerce' ) . '"' ),
+			array( 'context value', 'price', '49.9' ),
+			array( 'context value', 'currency', '"' . $currency . '"' ),
+		);
+		$cls = 'mouseplayer-wc-payload' . ( empty( $s['send_value'] ) ? '' : ' send-value' ) . ( empty( $s['send_context'] ) ? '' : ' send-context' );
+		echo '<div class="' . esc_attr( $cls ) . '" id="mouseplayer-wc-payload"><p class="mouseplayer-wc-payload-title">' . esc_html__( 'Example: a product page view', 'mouseplayer-for-woocommerce' ) . '</p><div class="mouseplayer-wc-code">';
+		foreach ( $lines as $line ) {
+			if ( '{' === $line[2] ) {
+				$label = 'view_item' === $line[1] ? 'trackEvent( "view_item", {' : 'setContext( {';
+				echo '<div class="mouseplayer-wc-code-head" data-need="' . esc_attr( $line[0] ) . '">' . esc_html( $label ) . '</div>';
+				continue;
+			}
+			echo '<div class="mouseplayer-wc-code-line" data-need="' . esc_attr( $line[0] ) . '"><span class="mouseplayer-wc-code-key">' . esc_html( $line[1] ) . '</span>: <span class="mouseplayer-wc-code-val">' . esc_html( $line[2] ) . '</span></div>';
+		}
+		echo '</div><p class="mouseplayer-wc-payload-legend"><span class="mouseplayer-wc-legend-on">' . esc_html__( 'sent', 'mouseplayer-for-woocommerce' ) . '</span> <span class="mouseplayer-wc-legend-off">' . esc_html__( 'not sent with the current settings', 'mouseplayer-for-woocommerce' ) . '</span></p></div>';
+	}
+
+	/**
 	 * The six funnel steps as a small diagram. Steps that are switched off are
-	 * shown as gaps; admin.js follows the checkboxes.
+	 * shown as gaps; admin.js follows the checkboxes, and with JavaScript a
+	 * click on a step switches its checkbox.
 	 *
 	 * @param array $s Settings.
 	 */
@@ -240,12 +373,15 @@ class MousePlayer_WC_Settings {
 		echo '<div class="mouseplayer-wc-funnel-box">';
 		/* translators: 1: number of funnel steps switched on, 2: number of funnel steps. */
 		echo '<p class="mouseplayer-wc-funnel-summary" id="mouseplayer-wc-funnel-summary" aria-live="polite" data-text="' . esc_attr__( '%1$d of %2$d funnel steps are sent.', 'mouseplayer-for-woocommerce' ) . '">' . esc_html( sprintf( __( '%1$d of %2$d funnel steps are sent.', 'mouseplayer-for-woocommerce' ), $on, count( $steps ) ) ) . '</p>';
-		echo '<ol class="mouseplayer-wc-funnel" aria-hidden="true">';
+		$labels = $this->event_labels();
+		echo '<ol class="mouseplayer-wc-funnel" aria-label="' . esc_attr__( 'Funnel steps - a click switches the step', 'mouseplayer-for-woocommerce' ) . '">';
 		$i = 0;
 		foreach ( $steps as $key => $step ) {
 			++$i;
 			$width = 100 - ( $i - 1 ) * 9;
-			echo '<li class="' . esc_attr( empty( $s[ $key ] ) ? 'is-off' : 'is-on' ) . '" data-step="' . esc_attr( $key ) . '"><span class="mouseplayer-wc-funnel-bar" style="' . esc_attr( 'width:' . $width . '%' ) . '"><span class="dashicons dashicons-' . esc_attr( $step[0] ) . '"></span><span class="mouseplayer-wc-funnel-name">' . esc_html( $step[1] ) . '</span></span></li>';
+			$tip   = 'mouseplayer-wc-tip-' . $key;
+			echo '<li class="' . esc_attr( empty( $s[ $key ] ) ? 'is-off' : 'is-on' ) . '" data-step="' . esc_attr( $key ) . '"><button type="button" class="mouseplayer-wc-funnel-bar" style="' . esc_attr( 'width:' . $width . '%' ) . '" aria-pressed="' . ( empty( $s[ $key ] ) ? 'false' : 'true' ) . '" aria-describedby="' . esc_attr( $tip ) . '" disabled><span class="dashicons dashicons-' . esc_attr( $step[0] ) . '" aria-hidden="true"></span><span class="mouseplayer-wc-funnel-name">' . esc_html( $step[1] ) . '</span></button>';
+			echo '<span class="mouseplayer-wc-funnel-tip" role="tooltip" id="' . esc_attr( $tip ) . '">' . esc_html( $labels[ $key ] ) . '</span></li>';
 		}
 		echo '</ol>';
 		echo '<p class="description">' . esc_html__( 'Steps that are switched off stay empty in the funnel in MousePlayer.', 'mouseplayer-for-woocommerce' ) . '</p>';
@@ -304,6 +440,7 @@ class MousePlayer_WC_Settings {
 					echo '</span></label>';
 				}
 				echo '</fieldset>';
+				$this->consent_timeline( $s['consent_mode'] );
 				break;
 
 			case 'consent_cmp':
@@ -318,9 +455,24 @@ class MousePlayer_WC_Settings {
 
 			case 'exclude_roles':
 				echo '<fieldset><legend class="screen-reader-text">' . esc_html__( 'Do not record', 'mouseplayer-for-woocommerce' ) . '</legend>';
+				// Accounts per role (count_users() - numbers only, no user data).
+				$users    = count_users();
+				$per_role = isset( $users['avail_roles'] ) ? (array) $users['avail_roles'] : array();
+				$total    = isset( $users['total_users'] ) ? (int) $users['total_users'] : 0;
+				$excluded = 0;
 				foreach ( wp_roles()->get_names() as $role => $label ) {
-					echo '<label class="mouseplayer-wc-role"><input type="checkbox" name="' . esc_attr( $this->name( 'exclude_roles' ) ) . '[]" value="' . esc_attr( $role ) . '" ' . checked( in_array( $role, (array) $s['exclude_roles'], true ), true, false ) . ' /> ' . esc_html( translate_user_role( $label ) ) . '</label>';
+					$count     = isset( $per_role[ $role ] ) ? (int) $per_role[ $role ] : 0;
+					$is_on     = in_array( $role, (array) $s['exclude_roles'], true );
+					$excluded += $is_on ? $count : 0;
+					/* translators: %s: number of user accounts */
+					$title = sprintf( _n( '%s account', '%s accounts', $count, 'mouseplayer-for-woocommerce' ), number_format_i18n( $count ) );
+					echo '<label class="mouseplayer-wc-role"><input type="checkbox" name="' . esc_attr( $this->name( 'exclude_roles' ) ) . '[]" value="' . esc_attr( $role ) . '" data-count="' . esc_attr( (string) $count ) . '" ' . checked( $is_on, true, false ) . ' /><span class="mouseplayer-wc-role-name">' . esc_html( translate_user_role( $label ) ) . '</span><span class="mouseplayer-wc-role-count" title="' . esc_attr( $title ) . '"><span aria-hidden="true">' . esc_html( number_format_i18n( $count ) ) . '</span><span class="screen-reader-text">' . esc_html( $title ) . '</span></span></label>';
 				}
+				$excluded = min( $excluded, $total );
+				/* translators: 1: number of user accounts that are never recorded, 2: number of all user accounts */
+				$sentence = __( '%1$s of %2$s user accounts are never recorded.', 'mouseplayer-for-woocommerce' );
+				echo '<div class="mouseplayer-wc-roles-meter" data-total="' . esc_attr( (string) $total ) . '"><span class="mouseplayer-wc-meter" aria-hidden="true"><span class="mouseplayer-wc-meter-fill" style="' . esc_attr( 'width:' . ( $total ? round( $excluded / $total * 100 ) : 0 ) . '%' ) . '"></span></span>';
+				echo '<span class="mouseplayer-wc-meter-text" id="mouseplayer-wc-roles-text" aria-live="polite" data-text="' . esc_attr( $sentence ) . '">' . esc_html( sprintf( $sentence, number_format_i18n( $excluded ), number_format_i18n( $total ) ) ) . '</span></div>';
 				echo '<p class="description">' . esc_html__( 'Logged-in users with these roles are never recorded and send no events. Visitors who are not logged in are recorded after consent.', 'mouseplayer-for-woocommerce' ) . '</p>';
 				echo '</fieldset>';
 				break;
@@ -329,6 +481,7 @@ class MousePlayer_WC_Settings {
 				$this->checkbox( $s, 'mask_checkout', __( 'Mask checkout, order confirmation, order tracking and My Account', 'mouseplayer-for-woocommerce' ), __( 'The content of these pages is replaced by asterisks before it leaves the browser: names, addresses, email addresses and order details. Clicks and scrolling stay visible.', 'mouseplayer-for-woocommerce' ) );
 				$this->checkbox( $s, 'mask_cart', __( 'Mask the cart page as well', 'mouseplayer-for-woocommerce' ), __( 'Hides product names, prices and the postcode of the shipping calculator on the cart page.', 'mouseplayer-for-woocommerce' ) );
 				$this->checkbox( $s, 'ignore_typing', __( 'Do not record typing in shop forms', 'mouseplayer-for-woocommerce' ), __( 'Typing in checkout, address and account fields is not recorded at all, not even as asterisks. Applies to the classic and the block checkout.', 'mouseplayer-for-woocommerce' ) );
+				$this->masking_preview( $s );
 				break;
 
 			case 'identify_customers':
@@ -337,12 +490,9 @@ class MousePlayer_WC_Settings {
 
 			case 'events':
 				echo '<fieldset><legend class="screen-reader-text">' . esc_html__( 'Events', 'mouseplayer-for-woocommerce' ) . '</legend>';
-				$this->checkbox( $s, 'ev_view_item_list', __( 'view_item_list: shop, category, tag and product search pages', 'mouseplayer-for-woocommerce' ) );
-				$this->checkbox( $s, 'ev_select_item', __( 'select_item: click on a product in a list', 'mouseplayer-for-woocommerce' ) );
-				$this->checkbox( $s, 'ev_view_item', __( 'view_item: product page', 'mouseplayer-for-woocommerce' ) );
-				$this->checkbox( $s, 'ev_add_to_cart', __( 'add_to_cart: product page, lists and blocks', 'mouseplayer-for-woocommerce' ) );
-				$this->checkbox( $s, 'ev_begin_checkout', __( 'begin_checkout: checkout page with a filled cart', 'mouseplayer-for-woocommerce' ) );
-				$this->checkbox( $s, 'ev_purchase', __( 'purchase: order confirmation, once per order', 'mouseplayer-for-woocommerce' ) );
+				foreach ( $this->event_labels() as $ev_key => $ev_label ) {
+					$this->checkbox( $s, $ev_key, $ev_label );
+				}
 				echo '</fieldset>';
 				$this->funnel( $s );
 				break;
@@ -350,6 +500,7 @@ class MousePlayer_WC_Settings {
 			case 'event_data':
 				$this->checkbox( $s, 'send_value', __( 'Send prices, order value and currency', 'mouseplayer-for-woocommerce' ), __( 'Needed for the revenue under the Purchase step of the funnel.', 'mouseplayer-for-woocommerce' ) );
 				$this->checkbox( $s, 'send_context', __( 'Send the page context', 'mouseplayer-for-woocommerce' ), __( 'Page type, product ID, category, stock status and cart size; with prices switched on also the product price, the cart value and the currency. MousePlayer uses it to describe sessions, for example "compared three products of the same category".', 'mouseplayer-for-woocommerce' ) );
+				$this->payload_preview( $s );
 				break;
 
 			case 'verify_token':
